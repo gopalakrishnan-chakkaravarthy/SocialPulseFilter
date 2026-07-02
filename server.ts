@@ -1028,9 +1028,18 @@ async function setupServer() {
     app.use(vite.middlewares);
   } else {
     console.log("Serving production static files...");
-    const distPath = path.join(process.cwd(), "dist");
+    // Robust path resolution regardless of start command CWD (e.g. running from root or dist/)
+    const distPath = __dirname.endsWith("dist") 
+      ? __dirname 
+      : path.join(__dirname, "dist");
+      
     app.use(express.static(distPath));
+    
+    // Prevent serving index.html for missing assets or API routes, return a clear 404 instead
     app.get("*", (req, res) => {
+      if (req.path.startsWith("/assets/") || req.path.startsWith("/api/")) {
+        return res.status(404).send("Asset not found");
+      }
       res.sendFile(path.join(distPath, "index.html"));
     });
   }
