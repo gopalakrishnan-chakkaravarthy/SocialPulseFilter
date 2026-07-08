@@ -135,6 +135,9 @@ export default function App() {
   const [selectedPlatformFilter, setSelectedPlatformFilter] = useState<string>("All");
   const [selectedCategoryFilter, setSelectedCategoryFilter] = useState<string>("All");
   const [selectedSentimentFilter, setSelectedSentimentFilter] = useState<string>("All");
+  const [selectedChannelFilter, setSelectedChannelFilter] = useState<string>("All");
+  const [minSentiment, setMinSentiment] = useState<number>(-1.0);
+  const [maxSentiment, setMaxSentiment] = useState<number>(1.0);
   const [searchQuery, setSearchQuery] = useState<string>("");
   const [selectedKeyword, setSelectedKeyword] = useState<string | null>(null);
   const [expandedCard, setExpandedCard] = useState<string | null>(null);
@@ -763,6 +766,14 @@ export default function App() {
       if (selectedSentimentFilter !== "All" && video.sentimentLabel !== selectedSentimentFilter) {
         return false;
       }
+      // Sentiment Score Range Filter
+      if (video.sentimentScore < minSentiment || video.sentimentScore > maxSentiment) {
+        return false;
+      }
+      // Channel Name Filter
+      if (selectedChannelFilter !== "All" && video.uploader !== selectedChannelFilter) {
+        return false;
+      }
       // Trending Keyword Tag Match
       if (selectedKeyword && !video.title.toLowerCase().includes(selectedKeyword.toLowerCase()) && !video.summary.toLowerCase().includes(selectedKeyword.toLowerCase())) {
         return false;
@@ -780,6 +791,13 @@ export default function App() {
   };
 
   const filteredVideos = getFilteredVideos();
+
+  // Dynamic list of unique channel names / uploaders from loaded data
+  const channelNames = React.useMemo(() => {
+    if (!data || !data.videos) return [];
+    const unique = new Set(data.videos.map(v => v.uploader));
+    return Array.from(unique).sort();
+  }, [data]);
 
   // Helper to export filtered/sorted list to Excel (CSV format with Blob encoding and Byte Order Mark for robust Excel viewing)
   const exportCategoryToExcel = (categoryName: string, videosToExport: any[]) => {
@@ -1162,6 +1180,91 @@ export default function App() {
                   <span>14 days</span>
                 </div>
               </div>
+            </div>
+
+            {/* Sentiment Score Range Slider */}
+            <div className="space-y-2">
+              <div className="flex items-center justify-between text-xs">
+                <label className="font-semibold text-slate-500 flex items-center gap-1">
+                  <Sparkles className="w-3.5 h-3.5 text-indigo-500" />
+                  Sentiment Score Horizon
+                </label>
+                <span className="font-mono text-indigo-600 bg-indigo-50 border border-indigo-100 px-2 py-0.5 rounded font-bold">
+                  {minSentiment.toFixed(1)} to {maxSentiment.toFixed(1)}
+                </span>
+              </div>
+              
+              <div className="space-y-3 bg-slate-50 p-2.5 rounded-lg border border-slate-150">
+                {/* Min Slider */}
+                <div className="space-y-1">
+                  <div className="flex justify-between text-[10px] font-medium text-slate-500">
+                    <span>Minimum Sentiment</span>
+                    <span className="font-mono font-bold text-slate-700">{minSentiment.toFixed(1)}</span>
+                  </div>
+                  <input
+                    type="range"
+                    min="-1.0"
+                    max="1.0"
+                    step="0.1"
+                    value={minSentiment}
+                    onChange={(e) => {
+                      const val = parseFloat(e.target.value);
+                      if (val <= maxSentiment) {
+                        setMinSentiment(val);
+                      }
+                    }}
+                    className="w-full accent-indigo-600 h-1.5 bg-slate-200 rounded-lg cursor-pointer"
+                  />
+                </div>
+
+                {/* Max Slider */}
+                <div className="space-y-1">
+                  <div className="flex justify-between text-[10px] font-medium text-slate-500">
+                    <span>Maximum Sentiment</span>
+                    <span className="font-mono font-bold text-slate-700">{maxSentiment.toFixed(1)}</span>
+                  </div>
+                  <input
+                    type="range"
+                    min="-1.0"
+                    max="1.0"
+                    step="0.1"
+                    value={maxSentiment}
+                    onChange={(e) => {
+                      const val = parseFloat(e.target.value);
+                      if (val >= minSentiment) {
+                        setMaxSentiment(val);
+                      }
+                    }}
+                    className="w-full accent-indigo-600 h-1.5 bg-slate-200 rounded-lg cursor-pointer"
+                  />
+                </div>
+
+                <div className="flex justify-between text-[9px] text-slate-400 font-mono pt-1 border-t border-slate-200/55">
+                  <span className="text-red-500 font-medium">-1.0 (Neg)</span>
+                  <span className="text-slate-400">0.0 (Neu)</span>
+                  <span className="text-emerald-600 font-medium">+1.0 (Pos)</span>
+                </div>
+              </div>
+            </div>
+
+            {/* Channel/Creator Filter */}
+            <div className="space-y-2">
+              <label className="text-xs font-semibold text-slate-500 flex items-center gap-1">
+                <User className="w-3.5 h-3.5 text-slate-400" />
+                Target Channel / Creator
+              </label>
+              <select
+                value={selectedChannelFilter}
+                onChange={(e) => setSelectedChannelFilter(e.target.value)}
+                className="w-full bg-white border border-slate-200 text-slate-700 rounded-lg p-2 focus:outline-none text-xs shadow-sm focus:ring-1 focus:ring-indigo-500 focus:border-indigo-500 transition-colors"
+              >
+                <option value="All">All Channels ({channelNames.length})</option>
+                {channelNames.map((name) => (
+                  <option key={name} value={name}>
+                    {name}
+                  </option>
+                ))}
+              </select>
             </div>
 
             {/* Target Niche Categories */}
@@ -3088,7 +3191,7 @@ export default function App() {
                   </div>
 
                   {/* Sentiment Quick Filter */}
-                  <div className="flex items-center gap-1.5">
+                  <div className="flex items-center gap-1.5 mr-4">
                     <span className="text-slate-500 font-semibold">Sentiment:</span>
                     <select
                       value={selectedSentimentFilter}
@@ -3102,15 +3205,35 @@ export default function App() {
                     </select>
                   </div>
 
+                  {/* Channel Quick Filter */}
+                  <div className="flex items-center gap-1.5 mr-4">
+                    <span className="text-slate-500 font-semibold">Channel:</span>
+                    <select
+                      value={selectedChannelFilter}
+                      onChange={(e) => setSelectedChannelFilter(e.target.value)}
+                      className="bg-white border border-slate-200 text-slate-700 rounded px-2 py-1 focus:outline-none text-xs shadow-sm"
+                    >
+                      <option value="All">All Channels</option>
+                      {channelNames.map((name) => (
+                        <option key={name} value={name}>
+                          {name}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+
                   {/* Clear all filter states button */}
-                  {(selectedPlatformFilter !== "All" || selectedCategoryFilter !== "All" || selectedSentimentFilter !== "All" || searchQuery !== "" || selectedKeyword) && (
+                  {(selectedPlatformFilter !== "All" || selectedCategoryFilter !== "All" || selectedSentimentFilter !== "All" || selectedChannelFilter !== "All" || searchQuery !== "" || selectedKeyword || minSentiment !== -1.0 || maxSentiment !== 1.0) && (
                     <button
                       onClick={() => {
                         setSelectedPlatformFilter("All");
                         setSelectedCategoryFilter("All");
                         setSelectedSentimentFilter("All");
+                        setSelectedChannelFilter("All");
                         setSearchQuery("");
                         setSelectedKeyword(null);
+                        setMinSentiment(-1.0);
+                        setMaxSentiment(1.0);
                       }}
                       className="ml-auto px-2.5 py-1 text-[11px] font-bold text-blue-700 bg-blue-50 border border-blue-200 rounded transition hover:bg-blue-100"
                     >
