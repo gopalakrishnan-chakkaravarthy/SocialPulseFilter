@@ -30,7 +30,7 @@ const getGeminiClient = () => {
 
 const ai = getGeminiClient();
 
-// Detailed static fallback data for political, history, and sports in Tamil Nadu and Globally
+// Detailed dynamic fallback data for political, history, and sports in Tamil Nadu and Globally
 const fallbackData = (days: number, region: string, categories: string[]) => {
   const isTN = region.toLowerCase().includes("tamil");
   
@@ -49,207 +49,152 @@ const fallbackData = (days: number, region: string, categories: string[]) => {
     mlConfidence: number;
     summary: string;
     region: string;
-  }> = [
-    // Tamil Nadu - Political
-    {
-      id: "tn-pol-1",
-      title: "Tamil Nadu Assembly Debates: New Infrastructure Bill Passed for Chennai Transit",
-      platform: "YouTube" as const,
-      category: "political" as const,
-      uploader: "Polimer News TN",
-      uploadedAt: "1 day ago",
-      views: 125000,
-      likes: 8400,
-      url: "https://www.youtube.com/watch?v=dQw4w9WgXcQ",
-      sentimentScore: 0.4,
-      sentimentLabel: "Positive" as const,
-      mlConfidence: 0.95,
-      summary: "Live broadcast and analysis of the pass of the Metro Transit infrastructure bill. Citizen reactions are moderately positive with anticipation for reduced traffic congestion.",
-      region: "Tamil Nadu"
-    },
-    {
-      id: "tn-pol-2",
-      title: "Political Coalitions Shift Ahead of Tamil Nadu Civic Elections",
-      platform: "Facebook" as const,
-      category: "political" as const,
-      uploader: "Thanthi TV",
-      uploadedAt: "3 days ago",
-      views: 74000,
-      likes: 3100,
-      url: "https://www.facebook.com/watch",
-      sentimentScore: -0.2,
-      sentimentLabel: "Negative" as const,
-      mlConfidence: 0.92,
-      summary: "Debate on the breaking alignments between major state parties. Viewers express cynicism and concern regarding candidate loyalty and manifesto implementation.",
-      region: "Tamil Nadu"
-    },
-    // Tamil Nadu - History
-    {
-      id: "tn-his-1",
-      title: "Keeladi Excavations Year 10: Crucial Sangam Era Artifacts Uncovered in Madurai",
-      platform: "YouTube" as const,
-      category: "history" as const,
-      uploader: "Keeladi Heritage Project",
-      uploadedAt: "2 days ago",
-      views: 310000,
-      likes: 24000,
-      url: "https://www.youtube.com/watch?v=dQw4w9WgXcQ",
-      sentimentScore: 0.9,
-      sentimentLabel: "Positive" as const,
-      mlConfidence: 0.98,
-      summary: "A thrilling documentary highlighting the carbon dating of pottery structures showing urban life dating back 2600 years. Highly positive reactions celebrating Tamil heritage.",
-      region: "Tamil Nadu"
-    },
-    {
-      id: "tn-his-2",
-      title: "The Architecture of Tanjore Big Temple: Chola Dynasty Engineering Secrets",
-      platform: "Instagram" as const,
-      category: "history" as const,
-      uploader: "HistoricTamilNadu",
-      uploadedAt: "4 days ago",
-      views: 185000,
-      likes: 19500,
-      url: "https://www.instagram.com/reels",
-      sentimentScore: 0.8,
-      sentimentLabel: "Positive" as const,
-      mlConfidence: 0.96,
-      summary: "A short educational reel detailing how the shadow of the vimana of Brihadisvara Temple never falls on the ground. Enthusiastic educational reception.",
-      region: "Tamil Nadu"
-    },
-    // Tamil Nadu - Sports
-    {
-      id: "tn-spo-1",
-      title: "Chennai Super Kings Training Camp Highlights - Dhoni Hits Big Sixes in Practice",
-      platform: "Instagram" as const,
-      category: "sports" as const,
-      uploader: "Chennai Super Kings Official",
-      uploadedAt: "1 day ago",
-      views: 1200000,
-      likes: 145000,
-      url: "https://www.instagram.com/reels",
-      sentimentScore: 0.95,
-      sentimentLabel: "Positive" as const,
-      mlConfidence: 0.99,
-      summary: "CSK training reel capturing practice games at Chepauk. Massive positive fan sentiment with viral sharing across Tamil Nadu.",
-      region: "Tamil Nadu"
-    },
-    {
-      id: "tn-spo-2",
-      title: "Tamil Nadu Chess Grandmasters Sweep State Invitational Championship",
-      platform: "YouTube" as const,
-      category: "sports" as const,
-      uploader: "Tamil Nadu Chess Association",
-      uploadedAt: "2 days ago",
-      views: 45000,
-      likes: 2800,
-      url: "https://www.youtube.com/watch?v=dQw4w9WgXcQ",
-      sentimentScore: 0.6,
-      sentimentLabel: "Positive" as const,
-      mlConfidence: 0.94,
-      summary: "Detailed breakdown of the final match where local prodigies exhibited state-of-the-art endgame tactics. High praise for the Chess nurturing program.",
-      region: "Tamil Nadu"
-    },
+  }> = [];
 
-    // Global - Political
-    {
-      id: "glb-pol-1",
-      title: "Global Climate Accord Summit: Major Nations Sign Carbon-Reduction Pact",
-      platform: "YouTube" as const,
-      category: "political" as const,
-      uploader: "Global News Network",
-      uploadedAt: "1 day ago",
-      views: 620000,
-      likes: 41000,
-      url: "https://www.youtube.com/watch?v=dQw4w9WgXcQ",
-      sentimentScore: 0.5,
-      sentimentLabel: "Positive" as const,
-      mlConfidence: 0.93,
-      summary: "Broadcast of the global leaders completing the emission capping pact. Public reactions are supportive but climate activists warn about lack of strict enforcement.",
-      region: "Global"
-    },
-    {
-      id: "glb-pol-2",
-      title: "Trade Agreements Breakdown sparks Economic Policy Debates",
-      platform: "Facebook" as const,
-      category: "political" as const,
-      uploader: "Financial Times Pulse",
-      uploadedAt: "3 days ago",
-      views: 290000,
-      likes: 12000,
-      url: "https://www.facebook.com/watch",
-      sentimentScore: -0.6,
-      sentimentLabel: "Negative" as const,
-      mlConfidence: 0.95,
-      summary: "Tensions rise over tariff updates. Global markets respond with high volatility. Public sentiment is pessimistic regarding inflation impacts.",
-      region: "Global"
-    },
-    // Global - History
-    {
-      id: "glb-his-1",
-      title: "Roman Empire Secrets Unveiled: Pompeii Deep Scan Reveals Undiscovered Streets",
-      platform: "YouTube" as const,
-      category: "history" as const,
-      uploader: "Archeology Today",
-      uploadedAt: "2 days ago",
-      views: 750000,
-      likes: 58000,
-      url: "https://www.youtube.com/watch?v=dQw4w9WgXcQ",
-      sentimentScore: 0.85,
-      sentimentLabel: "Positive" as const,
-      mlConfidence: 0.97,
-      summary: "Scientists use ground-penetrating radar to expose hidden pathways preserved in volcanic ash. Wide fascination and educational appreciation internationally.",
-      region: "Global"
-    },
-    {
-      id: "glb-his-2",
-      title: "The Industrial Revolution: How Steam Engines Altered Human Geography",
-      platform: "YouTube" as const,
-      category: "history" as const,
-      uploader: "Crash Course World History",
-      uploadedAt: "4 days ago",
-      views: 430000,
-      likes: 35000,
-      url: "https://www.youtube.com/watch?v=dQw4w9WgXcQ",
-      sentimentScore: 0.3,
-      sentimentLabel: "Positive" as const,
-      mlConfidence: 0.91,
-      summary: "Comprehensive look at the shift in demographics during the late 1700s. High academic value and neutral-to-positive analytical reviews.",
-      region: "Global"
-    },
-    // Global - Sports
-    {
-      id: "glb-spo-1",
-      title: "Athletics World Cup Finals: Records Broken in 100m Sprint Events",
-      platform: "YouTube" as const,
-      category: "sports" as const,
-      uploader: "World Athletics Feed",
-      uploadedAt: "1 day ago",
-      views: 1800000,
-      likes: 130000,
-      url: "https://www.youtube.com/watch?v=dQw4w9WgXcQ",
-      sentimentScore: 0.9,
-      sentimentLabel: "Positive" as const,
-      mlConfidence: 0.99,
-      summary: "Full visual highlights of the world record-breaking run. Overwhelming positive sportsmanship sentiment globally.",
-      region: "Global"
-    },
-    {
-      id: "glb-spo-2",
-      title: "Controversial Penalty Decision Causes Fan Outrage in European Champions Cup",
-      platform: "Facebook" as const,
-      category: "sports" as const,
-      uploader: "Futbol Talk Network",
-      uploadedAt: "2 days ago",
-      views: 940000,
-      likes: 42000,
-      url: "https://www.facebook.com/watch",
-      sentimentScore: -0.7,
-      sentimentLabel: "Negative" as const,
-      mlConfidence: 0.96,
-      summary: "Pundit analysis of the final-minute red card. Heavy arguments and negative debate between opposing fan bases online.",
-      region: "Global"
+  // Dynamically generate entries based strictly on category parameters to avoid hardcoded channels, page names, or platform URLs
+  categories.forEach((cat) => {
+    const c = cat.toLowerCase();
+    if (c !== "political" && c !== "history" && c !== "sports") {
+      const categoryName = c.charAt(0).toUpperCase() + c.slice(1);
+      const platform1 = "YouTube";
+      const platform2 = "Instagram";
+      
+      const title1 = isTN
+        ? `Tamil Nadu Regional ${categoryName} Insights & Community Update`
+        : `Global ${categoryName} Summit: Innovations & Trending Discussion`;
+      const summary1 = `An exciting look into state-of-the-art ${categoryName} practices and discussions. Receives extremely favorable responses from community leads.`;
+      
+      const title2 = isTN
+        ? `Debate & Skepticism Surrounding Tamil Nadu's New ${categoryName} Framework`
+        : `Global Analysis: Challenging Perspectives on Contemporary ${categoryName} Trends`;
+      const summary2 = `An analytical piece detailing the challenges, structural concerns, and community responses regarding recent ${categoryName} developments.`;
+      
+      allVideos.push({
+        id: `${isTN ? "tn" : "glb"}-${c}-1`,
+        title: title1,
+        platform: platform1,
+        category: c as any,
+        uploader: `${categoryName} Daily`,
+        uploadedAt: "1 day ago",
+        views: 240000,
+        likes: 18000,
+        url: "https://www.youtube.com/watch?v=dQw4w9WgXcQ",
+        sentimentScore: 0.7,
+        sentimentLabel: "Positive",
+        mlConfidence: 0.92,
+        summary: summary1,
+        region: isTN ? "Tamil Nadu" : "Global"
+      });
+
+      allVideos.push({
+        id: `${isTN ? "tn" : "glb"}-${c}-2`,
+        title: title2,
+        platform: platform2,
+        category: c as any,
+        uploader: `${categoryName} Watch`,
+        uploadedAt: "2 days ago",
+        views: 85000,
+        likes: 4200,
+        url: "https://www.instagram.com/reels",
+        sentimentScore: -0.2,
+        sentimentLabel: "Negative",
+        mlConfidence: 0.89,
+        summary: summary2,
+        region: isTN ? "Tamil Nadu" : "Global"
+      });
+      return;
     }
-  ];
+    const categoryName = c.charAt(0).toUpperCase() + c.slice(1);
+    const platform1 = c === "political" ? ("YouTube" as const) : c === "history" ? ("Instagram" as const) : ("Facebook" as const);
+    const platform2 = c === "political" ? ("Facebook" as const) : c === "history" ? ("YouTube" as const) : ("Instagram" as const);
+
+    // Video 1 (Positive)
+    let title1 = "";
+    let summary1 = "";
+    let score1 = 0.5;
+    let label1: "Positive" | "Neutral" | "Negative" = "Positive";
+
+    if (c === "political") {
+      title1 = isTN 
+        ? "Tamil Nadu Public Administration & Civic Welfare Policy Discussions" 
+        : "Global Governance Forums: Multi-National Policy Agreements & Carbon Strategy";
+      summary1 = `A detailed overview and citizen-engagement study on ${isTN ? "regional state transit and utility bills" : "international climate pact signatures and national carbon offsets"}. Public reaction shows moderate positive reception with highlight on executive action.`;
+      score1 = 0.4;
+    } else if (c === "history") {
+      title1 = isTN
+        ? "Heritage of South India: Architectural Records of Ancient Temples"
+        : "Ancient Civilizations: Deep Geological Scans Reveal Undiscovered Urban Centers";
+      summary1 = `Educational analysis on ${isTN ? "the design of Tanjore's Brihadisvara Temple and Chola engineering" : "hidden pathways and historical streets preserved in Pompeii ash"}. Highly positive reception from educators and history enthusiasts.`;
+      score1 = 0.85;
+    } else {
+      title1 = isTN
+        ? "Tamil Nadu Regional Sports League - Seasonal Matches & Training Ground Highlights"
+        : "Global Track and Field World Cup: Historic Record-Breaking Finals";
+      summary1 = `Recent athletic updates covering ${isTN ? "cricket training camp drills and state-sponsored chess tournaments" : "100-meter sprint record updates and final scores"}. Fans are extremely enthusiastic and celebrating online.`;
+      score1 = 0.9;
+    }
+
+    allVideos.push({
+      id: `${isTN ? "tn" : "glb"}-${c}-1`,
+      title: title1,
+      platform: platform1,
+      category: c as any,
+      uploader: `${categoryName} Hub`,
+      uploadedAt: "1 day ago",
+      views: c === "sports" ? 1200000 : c === "political" ? 125000 : 310000,
+      likes: c === "sports" ? 145000 : c === "political" ? 8400 : 24000,
+      url: platform1 === "YouTube" ? "https://www.youtube.com/watch?v=dQw4w9WgXcQ" : platform1 === "Instagram" ? "https://www.instagram.com/reels" : "https://www.facebook.com/watch",
+      sentimentScore: score1,
+      sentimentLabel: label1,
+      mlConfidence: 0.95,
+      summary: summary1,
+      region: isTN ? "Tamil Nadu" : "Global"
+    });
+
+    // Video 2 (Negative / Neutral)
+    let title2 = "";
+    let summary2 = "";
+    let score2 = -0.3;
+    let label2: "Positive" | "Neutral" | "Negative" = "Negative";
+
+    if (c === "political") {
+      title2 = isTN
+        ? "Tamil Nadu Public Debate: Analysis of Civic Infrastructure Resource Allocation"
+        : "Global Economic Forum: Policy Disputes Over High Volatility & Trade Tariffs";
+      summary2 = `Analytical debate covering ${isTN ? "opinions on shifting state partnerships and town-hall civic elections" : "discussions on market shifts and fiscal policy controversies"}. Online sentiment trends towards moderate concern and skepticism.`;
+      score2 = -0.2;
+    } else if (c === "history") {
+      title2 = isTN
+        ? "Archeological Excavations: Sangam Era Dating Controversy & Ancient Pottery Discoveries"
+        : "Industrial Revolution Transitions: Demographic shifts and Socio-Economic Hardships";
+      summary2 = `A close review of ${isTN ? "scientific carbon dating challenges regarding Tamil Nadu heritage locations" : "historical documents describing urban sprawl and 18th-century labor disputes"}. Triggers deep analytical and neutral-to-negative historical discussions.`;
+      score2 = 0.1;
+      label2 = "Neutral" as const;
+    } else {
+      title2 = isTN
+        ? "Controversial Referee Decisions in Regional Football Tournament Finals"
+        : "European Cup Penalty Debate Sparks Outrage and Pundit Heated Discussions";
+      summary2 = `A review of the final-minute red cards and referee arguments in the ${isTN ? "district-level sports tournament" : "European Champions Cup match"}. Fans are venting frustrations across multiple social platforms with highly critical debate.`;
+      score2 = -0.7;
+    }
+
+    allVideos.push({
+      id: `${isTN ? "tn" : "glb"}-${c}-2`,
+      title: title2,
+      platform: platform2,
+      category: c as any,
+      uploader: `${categoryName} Network`,
+      uploadedAt: "3 days ago",
+      views: c === "sports" ? 940000 : c === "political" ? 74000 : 185000,
+      likes: c === "sports" ? 42000 : c === "political" ? 3100 : 19500,
+      url: platform2 === "YouTube" ? "https://www.youtube.com/watch?v=dQw4w9WgXcQ" : platform2 === "Instagram" ? "https://www.instagram.com/reels" : "https://www.facebook.com/watch",
+      sentimentScore: score2,
+      sentimentLabel: label2,
+      mlConfidence: 0.94,
+      summary: summary2,
+      region: isTN ? "Tamil Nadu" : "Global"
+    });
+  });
 
   // Filter based on selected parameters
   const filteredRegion = allVideos.filter(v => 
@@ -258,14 +203,19 @@ const fallbackData = (days: number, region: string, categories: string[]) => {
 
   const filtered = filteredRegion.filter(v => categories.includes(v.category));
 
-  // Compute mock metrics based on actual matches
-  const youtubeCount = filtered.filter(v => v.platform === "YouTube").length;
-  const facebookCount = filtered.filter(v => v.platform === "Facebook").length;
-  const instagramCount = filtered.filter(v => v.platform === "Instagram").length;
+  // Compute mock metrics based on actual matches dynamically
+  const platformCounts: Record<string, number> = {};
+  filtered.forEach(v => {
+    if (v.platform) {
+      const key = v.platform.toLowerCase();
+      platformCounts[key] = (platformCounts[key] || 0) + 1;
+    }
+  });
 
-  const politicalCount = filtered.filter(v => v.category === "political").length;
-  const historyCount = filtered.filter(v => v.category === "history").length;
-  const sportsCount = filtered.filter(v => v.category === "sports").length;
+  const categoryBreakdownObj: Record<string, number> = {};
+  categories.forEach(c => {
+    categoryBreakdownObj[c] = filtered.filter(v => v.category === c).length;
+  });
 
   const positiveCount = filtered.filter(v => v.sentimentLabel === "Positive").length;
   const neutralCount = filtered.filter(v => v.sentimentLabel === "Neutral").length;
@@ -278,16 +228,8 @@ const fallbackData = (days: number, region: string, categories: string[]) => {
     videos: filtered,
     analytics: {
       totalLoaded: filtered.length,
-      platformBreakdown: {
-        youtube: youtubeCount,
-        facebook: facebookCount,
-        instagram: instagramCount
-      },
-      categoryBreakdown: {
-        political: politicalCount,
-        history: historyCount,
-        sports: sportsCount
-      },
+      platformBreakdown: platformCounts,
+      categoryBreakdown: categoryBreakdownObj,
       sentimentBreakdown: {
         positive: positiveCount,
         neutral: neutralCount,
@@ -346,19 +288,21 @@ app.get("/api/videos", async (req, res) => {
   try {
     const isTN = region.toLowerCase().includes("tamil");
     const targetRegionName = isTN ? "Tamil Nadu, India" : "Global/Worldwide";
-    
+    const categoryListStr = categories.map(c => `"${c}"`).join(", ");
+    const categoryUnionType = categories.map(c => `"${c}"`).join(" | ");
+
     // Formulate a robust prompt to get the exact data using Google Search Grounding
     const query = `Find real social media video posts or uploaded video clips on YouTube, Facebook, or Instagram from the last ${days} days representing the region "${targetRegionName}".
-The content must cover the following topics: political news, history insights/heritage, or sports events. 
+The content must cover the following topics/categories: ${categoryListStr}.
 Analyze recent uploads, trending tags, and find actual titles, real uploaders, real links (URLs) from the search grounding context, view estimates, and likes counts.
 Then, output a single JSON object containing:
 1. "videos": An array of at least 6 detailed video/reels posts representing the filtered criteria.
 2. "analytics": High-level aggregates and summaries of the matches.
 
-Ensure that the output strictly follows the schema structure. Categorize each item as "political", "history", or "sports". Sentiment analysis must be scored from -1.0 to +1.0. mlConfidence is the category confidence from 0.0 to 1.0.`;
+Ensure that the output strictly follows the schema structure. Categorize each item as one of these categories: ${categoryListStr}. Sentiment analysis must be scored from -1.0 to +1.0. mlConfidence is the category confidence from 0.0 to 1.0.`;
 
     const systemInstruction = `You are an AI-powered social media classifier and sentiment analyzer. You use Google Search to find real videos and Reels from YouTube, Facebook, and Instagram uploaded in the last N days for the specified region and categories.
-For each post you find, you must perform machine learning categorization ("political" | "history" | "sports"), sentiment scoring (from -1.0 for highly hostile or tragic to +1.0 for enthusiastic/highly positive), and classify its sentiment label ("Positive" | "Neutral" | "Negative").
+For each post you find, you must perform machine learning categorization (${categoryUnionType}), sentiment scoring (from -1.0 for highly hostile or tragic to +1.0 for enthusiastic/highly positive), and classify its sentiment label ("Positive" | "Neutral" | "Negative").
 Also extract the actual social media links (e.g. youtube.com, facebook.com, instagram.com URLs) from the grounding search results.
 
 You MUST respond with a single valid JSON object that fits this exact schema structure:
@@ -367,8 +311,8 @@ You MUST respond with a single valid JSON object that fits this exact schema str
     {
       "id": "string (unique ID like tn-1)",
       "title": "string (real video title or post header)",
-      "platform": "YouTube" | "Facebook" | "Instagram",
-      "category": "political" | "history" | "sports",
+      "platform": "string (YouTube, Facebook, Instagram, TikTok, LinkedIn, or any platform name discovered)",
+      "category": ${categoryUnionType},
       "uploader": "string (channel or user page)",
       "uploadedAt": "string (relative time or date string)",
       "views": number (estimated view count),
@@ -384,14 +328,10 @@ You MUST respond with a single valid JSON object that fits this exact schema str
   "analytics": {
     "totalLoaded": number,
     "platformBreakdown": {
-      "youtube": number,
-      "facebook": number,
-      "instagram": number
+      "platform_name_lowercase": number (e.g. "youtube": 3, "tiktok": 2)
     },
     "categoryBreakdown": {
-      "political": number,
-      "history": number,
-      "sports": number
+      ${categories.map(c => `"${c}": number`).join(",\n      ")}
     },
     "sentimentBreakdown": {
       "positive": number,
@@ -438,16 +378,19 @@ Do NOT wrap the response in markdown blocks like \`\`\`json. Output raw JSON onl
       });
       // Recalculate aggregates to match actual results precisely
       data.analytics.totalLoaded = data.videos.length;
-      data.analytics.platformBreakdown = {
-        youtube: data.videos.filter((v: any) => v.platform?.toLowerCase() === "youtube").length,
-        facebook: data.videos.filter((v: any) => v.platform?.toLowerCase() === "facebook").length,
-        instagram: data.videos.filter((v: any) => v.platform?.toLowerCase() === "instagram").length,
-      };
-      data.analytics.categoryBreakdown = {
-        political: data.videos.filter((v: any) => v.category?.toLowerCase() === "political").length,
-        history: data.videos.filter((v: any) => v.category?.toLowerCase() === "history").length,
-        sports: data.videos.filter((v: any) => v.category?.toLowerCase() === "sports").length,
-      };
+      const platformsObj: Record<string, number> = {};
+      data.videos.forEach((v: any) => {
+        if (v.platform) {
+          const key = v.platform.toLowerCase();
+          platformsObj[key] = (platformsObj[key] || 0) + 1;
+        }
+      });
+      data.analytics.platformBreakdown = platformsObj;
+      const catBreakdown: Record<string, number> = {};
+      categories.forEach(c => {
+        catBreakdown[c] = data.videos.filter((v: any) => v.category?.toLowerCase() === c).length;
+      });
+      data.analytics.categoryBreakdown = catBreakdown;
       data.analytics.sentimentBreakdown = {
         positive: data.videos.filter((v: any) => v.sentimentLabel === "Positive").length,
         neutral: data.videos.filter((v: any) => v.sentimentLabel === "Neutral").length,
@@ -491,6 +434,99 @@ Do NOT wrap the response in markdown blocks like \`\`\`json. Output raw JSON onl
       errorDetail: isQuotaExceeded ? "API rate-limit reached. Operating in high-fidelity sandbox mode." : errorMsg
     };
     res.json(fallbackResponse);
+  }
+});
+
+// Helper for generating high-fidelity fallback summaries
+const getMockLongSummary = (title: string, summary: string, category: string, uploader: string, platform: string) => {
+  return `### Comprehensive Video Intelligence Analysis
+
+This is a comprehensive, deep-dive analysis of the trending **${platform}** video titled **"${title}"** published by **@${uploader}**.
+
+The core subject focuses on **${category}** developments, specifically addressing the key themes originally outlined as: *"${summary}"*. In this detailed review, the video explores the structural and societal impact of these events, sparking a highly engaged conversation within the community.
+
+### 📋 Key Takeaways & Discussion Points
+* **Contextualized Community Response**: The discussion centers on public reaction and regional sentiment shifts.
+* **Uploader Influence**: The content highlight's @${uploader}'s unique perspective and how their presentation drives engagement.
+* **Platform Dissemination Patterns**: Engagement markers on ${platform} indicate rapid audience share expansion and high discussion density.
+
+### 📈 Expert Community Impact & Viral Potential
+Ultimately, the video serves as a critical reference point for understanding current discussions surrounding **${category}** trends. Given the strong engagement rates, it possesses substantial momentum to remain a key talking point in the upcoming days.`;
+};
+
+// API: Generate Detailed Summary using Gemini
+app.post("/api/generate-summary", async (req, res) => {
+  const { title, summary, category, uploader, platform } = req.body;
+
+  console.log(`[API /api/generate-summary] Generating detailed summary for: "${title}"`);
+
+  const fallbackSummary = getMockLongSummary(title || "", summary || "", category || "", uploader || "", platform || "");
+
+  if (!ai) {
+    console.log("[Gemini Engine] API Key is missing. Serving high-fidelity mock summary.");
+    return res.json({ summary: fallbackSummary, isFallback: true });
+  }
+
+  try {
+    const query = `Create a comprehensive, highly engaging, and detailed summary for this social media video:
+Title: ${title}
+Platform: ${platform}
+Category: ${category}
+Uploader: @${uploader}
+Brief Context: ${summary}
+
+The detailed summary should be about 3-4 paragraphs (around 150-200 words) and must:
+1. Provide a detailed narrative of the core topic, setting the political, historical, or sports context.
+2. Outline 3 key discussion points or takeaways with bullet points.
+3. Conclude with an expert analysis of its community impact and viral potential.
+
+Format the output clearly using elegant markdown with appropriate line breaks. Return a JSON with a single 'summary' property.`;
+
+    const systemInstruction = `You are a professional social media content analyst and video intelligence expert. Create a detailed, insightful, and comprehensive summary of the video based on the provided metadata. Use professional, engaging language and clean Markdown styling.
+You MUST respond with a single valid JSON object following this exact schema:
+{
+  "summary": "markdown formatted detailed summary string"
+}`;
+
+    const response = await ai.models.generateContent({
+      model: "gemini-3.5-flash",
+      contents: query,
+      config: {
+        systemInstruction: systemInstruction,
+        responseMimeType: "application/json",
+        responseSchema: {
+          type: Type.OBJECT,
+          properties: {
+            summary: {
+              type: Type.STRING,
+              description: "The Markdown formatted detailed summary of the video content."
+            }
+          },
+          required: ["summary"]
+        },
+        temperature: 0.5
+      }
+    });
+
+    const responseText = response.text || "";
+    let data;
+    try {
+      const cleanJson = responseText.replace(/```json\s?|```/g, "").trim();
+      data = JSON.parse(cleanJson);
+    } catch (parseError) {
+      console.error("Gemini Summary JSON parse failed, serving fallback. Raw text:", responseText);
+      throw parseError;
+    }
+
+    if (data && typeof data.summary === "string" && data.summary.trim().length > 0) {
+      res.json({ summary: data.summary, isFallback: false });
+    } else {
+      res.json({ summary: fallbackSummary, isFallback: true });
+    }
+
+  } catch (error: any) {
+    console.log(`[Gemini Engine] Summary generation fallback active: ${error.message || error}`);
+    res.json({ summary: fallbackSummary, isFallback: true, errorDetail: error.message || String(error) });
   }
 });
 
@@ -670,6 +706,7 @@ interface NotificationAlert {
   destinationEmail?: string;
   createdAt: string;
   active: boolean;
+  label?: string;
 }
 
 interface AlertTriggeredLog {
@@ -692,7 +729,8 @@ let serverAlerts: NotificationAlert[] = [
     channel: "both",
     destinationEmail: "karthi.krishna6587@gmail.com",
     createdAt: new Date(Date.now() - 3600000 * 5).toISOString(),
-    active: true
+    active: true,
+    label: "Core AI Buzz Monitor"
   },
   {
     id: "alert-2",
@@ -703,7 +741,8 @@ let serverAlerts: NotificationAlert[] = [
     channel: "push",
     destinationEmail: "",
     createdAt: new Date(Date.now() - 3600000 * 2).toISOString(),
-    active: true
+    active: true,
+    label: "Political Sentiment Drop Watcher"
   }
 ];
 
@@ -711,7 +750,7 @@ let serverTriggeredLogs: AlertTriggeredLog[] = [
   {
     id: "log-1",
     alertId: "alert-1",
-    alertTitle: "Keyword: 'AI' - View count threshold reached",
+    alertTitle: "[Core AI Buzz Monitor] Keyword: 'AI' - View count threshold reached",
     videoTitle: "Introduction to AI Agents in Tamil Nadu",
     matchedValue: "18,450 views (Threshold: 10,000+)",
     triggeredAt: new Date(Date.now() - 3600000 * 4).toISOString(),
@@ -726,7 +765,7 @@ app.get("/api/alerts", (req, res) => {
 
 // API: Register a New Alert
 app.post("/api/alerts", (req, res) => {
-  const { type, targetValue, metric, threshold, channel, destinationEmail } = req.body;
+  const { type, targetValue, metric, threshold, channel, destinationEmail, label } = req.body;
   if (!targetValue) {
     return res.status(400).json({ error: "Target keyword or category is required." });
   }
@@ -739,10 +778,23 @@ app.post("/api/alerts", (req, res) => {
     channel,
     destinationEmail: destinationEmail || "",
     createdAt: new Date().toISOString(),
-    active: true
+    active: true,
+    label: label ? String(label).trim() : undefined
   };
   serverAlerts.unshift(newAlert);
   res.json({ success: true, alert: newAlert, alerts: serverAlerts });
+});
+
+// API: Update an Alert label/fields
+app.post("/api/alerts/update", (req, res) => {
+  const { id, label } = req.body;
+  serverAlerts = serverAlerts.map(a => {
+    if (a.id === id) {
+      return { ...a, label: label ? String(label).trim() : "" };
+    }
+    return a;
+  });
+  res.json({ success: true, alerts: serverAlerts });
 });
 
 // API: Delete an Alert
@@ -834,9 +886,10 @@ app.post("/api/alerts/sweep", (req, res) => {
             ? `Email To: ${alert.destinationEmail}` 
             : "Browser Notification";
 
-        const alertTitle = alert.type === "keyword" 
+        const labelPrefix = alert.label ? `[${alert.label}] ` : "";
+        const alertTitle = labelPrefix + (alert.type === "keyword" 
           ? `Keyword: "${alert.targetValue}" - ${alert.metric === "views" ? "View count threshold reached" : "Sentiment change warning"}`
-          : `Category: "${alert.targetValue}" - ${alert.metric === "views" ? "View count threshold reached" : "Sentiment change warning"}`;
+          : `Category: "${alert.targetValue}" - ${alert.metric === "views" ? "View count threshold reached" : "Sentiment change warning"}`);
 
         newDispatches.push({
           id: "log-" + Math.random().toString(36).substring(2, 9),

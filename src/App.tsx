@@ -46,14 +46,16 @@ import {
   Bell,
   Mail,
   AlertTriangle,
-  Play
+  Play,
+  Tag,
+  Edit2
 } from "lucide-react";
 
 // Definitions matching server-side schema
 interface VideoPost {
   id: string;
   title: string;
-  platform: "YouTube" | "Facebook" | "Instagram";
+  platform: string;
   category: "political" | "history" | "sports";
   uploader: string;
   uploadedAt: string;
@@ -69,11 +71,7 @@ interface VideoPost {
 
 interface Analytics {
   totalLoaded: number;
-  platformBreakdown: {
-    youtube: number;
-    facebook: number;
-    instagram: number;
-  };
+  platformBreakdown: Record<string, number>;
   categoryBreakdown: {
     political: number;
     history: number;
@@ -106,6 +104,7 @@ interface NotificationAlert {
   destinationEmail?: string;
   createdAt: string;
   active: boolean;
+  label?: string;
 }
 
 interface AlertTriggeredLog {
@@ -117,6 +116,147 @@ interface AlertTriggeredLog {
   triggeredAt: string;
   channelUsed: string;
 }
+
+// Standalone helper to format and render markdown-like Gemini summaries
+const renderFormattedSummary = (text: string) => {
+  if (!text) return null;
+  const lines = text.split("\n");
+  return (
+    <div className="space-y-2 text-xs text-slate-700 leading-relaxed font-medium">
+      {lines.map((line, idx) => {
+        const trimmed = line.trim();
+        if (!trimmed) return <div key={idx} className="h-1"></div>;
+        
+        // Headers (e.g., ### Title)
+        if (trimmed.startsWith("###")) {
+          return (
+            <h5 key={idx} className="text-xs font-bold text-slate-900 mt-3 flex items-center gap-1.5 font-sans border-b border-indigo-100/30 pb-0.5">
+              {trimmed.replace(/^###\s*/, "")}
+            </h5>
+          );
+        }
+        
+        // Bullet points (e.g., * Bullet or • Bullet)
+        if (trimmed.startsWith("*") || trimmed.startsWith("•") || trimmed.startsWith("-")) {
+          const content = trimmed.replace(/^[\*\•\-]\s*/, "");
+          const boldMatch = content.match(/^\*\*(.*?)\*\*(.*)/);
+          if (boldMatch) {
+            return (
+              <div key={idx} className="flex items-start gap-1.5 pl-2 leading-relaxed text-[11px] text-slate-600">
+                <span className="text-indigo-500 font-bold mt-0.5">•</span>
+                <span>
+                  <strong className="text-slate-800 font-bold">{boldMatch[1]}</strong>
+                  {boldMatch[2]}
+                </span>
+              </div>
+            );
+          }
+          return (
+            <div key={idx} className="flex items-start gap-1.5 pl-2 leading-relaxed text-[11px] text-slate-600">
+              <span className="text-indigo-500 font-bold mt-0.5">•</span>
+              <span>{content}</span>
+            </div>
+          );
+        }
+        
+        // Check for inline bold markers (**bold**)
+        let renderedText: React.ReactNode = trimmed;
+        const boldMatch = trimmed.match(/\*\*(.*?)\*\*/g);
+        if (boldMatch) {
+          const parts = trimmed.split(/\*\*(.*?)\*\*/g);
+          renderedText = parts.map((part, pIdx) => {
+            if (pIdx % 2 === 1) {
+              return <strong key={pIdx} className="text-slate-800 font-bold">{part}</strong>;
+            }
+            return part;
+          });
+        }
+
+        return (
+          <p key={idx} className="text-slate-600 text-[11px] font-medium leading-relaxed">
+            {renderedText}
+          </p>
+        );
+      })}
+    </div>
+  );
+};
+
+
+// Centralized theme configuration for different categories
+export interface CategoryTheme {
+  bg: string;          // Primary background color for container/card
+  border: string;      // Border color
+  text: string;        // Text color for label / typography
+  badgeBg: string;     // Badge background
+  badgeText: string;   // Badge text color
+  badgeBorder: string; // Badge border
+  badge: string;       // Combined classes for badge
+  barBg: string;       // Background color for bar elements
+}
+
+export const CATEGORY_THEMES: Record<string, CategoryTheme> = {
+  political: {
+    bg: "bg-purple-50",
+    border: "border-purple-200",
+    text: "text-purple-700",
+    badgeBg: "bg-purple-50",
+    badgeText: "text-purple-700",
+    badgeBorder: "border-purple-200",
+    badge: "bg-purple-50 text-purple-700 border-purple-200",
+    barBg: "bg-purple-500"
+  },
+  history: {
+    bg: "bg-amber-50",
+    border: "border-amber-200",
+    text: "text-amber-700",
+    badgeBg: "bg-amber-50",
+    badgeText: "text-amber-700",
+    badgeBorder: "border-amber-200",
+    badge: "bg-amber-50 text-amber-700 border-amber-200",
+    barBg: "bg-amber-500"
+  },
+  sports: {
+    bg: "bg-emerald-50",
+    border: "border-emerald-200",
+    text: "text-emerald-700",
+    badgeBg: "bg-emerald-50",
+    badgeText: "text-emerald-700",
+    badgeBorder: "border-emerald-200",
+    badge: "bg-emerald-50 text-emerald-700 border-emerald-200",
+    barBg: "bg-emerald-500"
+  }
+};
+
+const DYNAMIC_THEME_PALETTES = [
+  { text: "text-indigo-700", bg: "bg-indigo-50", border: "border-indigo-200", badgeBg: "bg-indigo-50", badgeText: "text-indigo-700", badgeBorder: "border-indigo-200", barBg: "bg-indigo-500" },
+  { text: "text-rose-700", bg: "bg-rose-50", border: "border-rose-200", badgeBg: "bg-rose-50", badgeText: "text-rose-700", badgeBorder: "border-rose-200", barBg: "bg-rose-500" },
+  { text: "text-cyan-700", bg: "bg-cyan-50", border: "border-cyan-200", badgeBg: "bg-cyan-50", badgeText: "text-cyan-700", badgeBorder: "border-cyan-200", barBg: "bg-cyan-500" },
+  { text: "text-orange-700", bg: "bg-orange-50", border: "border-orange-200", badgeBg: "bg-orange-50", badgeText: "text-orange-700", badgeBorder: "border-orange-200", barBg: "bg-orange-500" },
+  { text: "text-pink-700", bg: "bg-pink-50", border: "border-pink-200", badgeBg: "bg-pink-50", badgeText: "text-pink-700", badgeBorder: "border-pink-200", barBg: "bg-pink-500" },
+  { text: "text-teal-700", bg: "bg-teal-50", border: "border-teal-200", badgeBg: "bg-teal-50", badgeText: "text-teal-700", badgeBorder: "border-teal-200", barBg: "bg-teal-500" }
+];
+
+// Helper function that maps category name to a theme from the centralized configuration object
+export const getCategoryColor = (cat: string): CategoryTheme => {
+  const norm = (cat || "").toLowerCase().trim();
+  if (CATEGORY_THEMES[norm]) {
+    return CATEGORY_THEMES[norm];
+  }
+  
+  // Stable hashing for dynamic/fallback categories
+  let hash = 0;
+  for (let i = 0; i < norm.length; i++) {
+    hash = norm.charCodeAt(i) + ((hash << 5) - hash);
+  }
+  const index = Math.abs(hash) % DYNAMIC_THEME_PALETTES.length;
+  const palette = DYNAMIC_THEME_PALETTES[index];
+  
+  return {
+    ...palette,
+    badge: `${palette.badgeBg} ${palette.badgeText} ${palette.badgeBorder}`
+  };
+};
 
 
 export default function App() {
@@ -131,11 +271,49 @@ export default function App() {
   const [error, setError] = useState<string | null>(null);
   const [refreshTrigger, setRefreshTrigger] = useState<number>(0);
   
+  // Auto-Refresh states
+  const [autoRefreshEnabled, setAutoRefreshEnabled] = useState<boolean>(false);
+  const [secondsUntilRefresh, setSecondsUntilRefresh] = useState<number>(300); // 5 minutes = 300 seconds
+
+  // Effect for Auto-Refresh Background Polling
+  useEffect(() => {
+    if (!autoRefreshEnabled) {
+      setSecondsUntilRefresh(300);
+      return;
+    }
+
+    const interval = setInterval(() => {
+      setSecondsUntilRefresh((prev) => {
+        if (prev <= 1) {
+          // Trigger data reload
+          setRefreshTrigger((r) => r + 1);
+          return 300; // Reset to 5 minutes
+        }
+        return prev - 1;
+      });
+    }, 1000);
+
+    return () => clearInterval(interval);
+  }, [autoRefreshEnabled]);
+
+  // Reset secondsUntilRefresh back to 300 whenever a refresh is triggered (manual or auto)
+  useEffect(() => {
+    if (autoRefreshEnabled) {
+      setSecondsUntilRefresh(300);
+    }
+  }, [refreshTrigger, autoRefreshEnabled]);
+
+  const formatTime = (secs: number) => {
+    const m = Math.floor(secs / 60);
+    const s = secs % 60;
+    return `${m}:${s < 10 ? "0" : ""}${s}`;
+  };
+  
   // Interactive client-side filters
   const [selectedPlatformFilter, setSelectedPlatformFilter] = useState<string>("All");
   const [selectedCategoryFilter, setSelectedCategoryFilter] = useState<string>("All");
   const [selectedSentimentFilter, setSelectedSentimentFilter] = useState<string>("All");
-  const [selectedChannelFilter, setSelectedChannelFilter] = useState<string>("All");
+  const [showOnlyTop10BySentiment, setShowOnlyTop10BySentiment] = useState<boolean>(true);
   const [minSentiment, setMinSentiment] = useState<number>(-1.0);
   const [maxSentiment, setMaxSentiment] = useState<number>(1.0);
   const [searchQuery, setSearchQuery] = useState<string>("");
@@ -158,6 +336,11 @@ export default function App() {
   const [loadingExplanations, setLoadingExplanations] = useState<Record<string, boolean>>({});
   const [explanations, setExplanations] = useState<Record<string, string[]>>({});
   const [explanationErrors, setExplanationErrors] = useState<Record<string, string>>({});
+
+  // States for Gemini-generated long detailed summaries
+  const [loadingLongSummaries, setLoadingLongSummaries] = useState<Record<string, boolean>>({});
+  const [longSummaries, setLongSummaries] = useState<Record<string, string>>({});
+  const [longSummaryErrors, setLongSummaryErrors] = useState<Record<string, string>>({});
 
   // Custom Developer Keys Configuration Tray
   const [showDeveloperSettings, setShowDeveloperSettings] = useState<boolean>(false);
@@ -283,6 +466,9 @@ export default function App() {
   const [newAlertThreshold, setNewAlertThreshold] = useState<string>("");
   const [newAlertChannel, setNewAlertChannel] = useState<"email" | "push" | "both">("both");
   const [newAlertEmail, setNewAlertEmail] = useState<string>("karthi.krishna6587@gmail.com");
+  const [newAlertLabel, setNewAlertLabel] = useState<string>("");
+  const [editingAlertId, setEditingAlertId] = useState<string | null>(null);
+  const [editingAlertLabel, setEditingAlertLabel] = useState<string>("");
   const [isAlertScanning, setIsAlertScanning] = useState<boolean>(false);
   const [alertsLoading, setAlertsLoading] = useState<boolean>(false);
   const [alertsError, setAlertsError] = useState<string | null>(null);
@@ -344,7 +530,8 @@ export default function App() {
           metric: newAlertMetric,
           threshold: parseFloat(newAlertThreshold),
           channel: newAlertChannel,
-          destinationEmail: newAlertEmail
+          destinationEmail: newAlertEmail,
+          label: newAlertLabel.trim() || undefined
         })
       });
       if (!response.ok) {
@@ -354,6 +541,7 @@ export default function App() {
       setAlerts(result.alerts);
       setNewAlertTarget("");
       setNewAlertThreshold("");
+      setNewAlertLabel("");
       setShareToast({
         message: "Successfully registered real-time alert trigger!",
         type: "success"
@@ -400,6 +588,28 @@ export default function App() {
       }
     } catch (err) {
       console.error("Delete alert error:", err);
+    }
+  };
+
+  const handleUpdateAlertLabel = async (id: string, label: string) => {
+    try {
+      const response = await fetch("/api/alerts/update", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ id, label })
+      });
+      if (response.ok) {
+        const result = await response.json();
+        setAlerts(result.alerts);
+        setEditingAlertId(null);
+        setEditingAlertLabel("");
+        setShareToast({
+          message: "Alert rule label updated successfully.",
+          type: "success"
+        });
+      }
+    } catch (err) {
+      console.error("Update alert label error:", err);
     }
   };
 
@@ -535,6 +745,46 @@ export default function App() {
       setExplanationErrors(prev => ({ ...prev, [video.id]: err.message || "Unknown explanation error" }));
     } finally {
       setLoadingExplanations(prev => ({ ...prev, [video.id]: false }));
+    }
+  };
+
+  const handleGenerateLongSummary = async (video: VideoPost) => {
+    // If we already loaded a long summary for this video, we don't need to load again
+    if (longSummaries[video.id]) return;
+
+    setLoadingLongSummaries(prev => ({ ...prev, [video.id]: true }));
+    setLongSummaryErrors(prev => ({ ...prev, [video.id]: "" }));
+
+    try {
+      const response = await fetch("/api/generate-summary", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json"
+        },
+        body: JSON.stringify({
+          title: video.title,
+          summary: video.summary,
+          category: video.category,
+          uploader: video.uploader,
+          platform: video.platform
+        })
+      });
+
+      if (!response.ok) {
+        throw new Error(`HTTP Error ${response.status}`);
+      }
+
+      const result = await response.json();
+      if (result && typeof result.summary === "string") {
+        setLongSummaries(prev => ({ ...prev, [video.id]: result.summary }));
+      } else {
+        throw new Error("Invalid response format received from summary generation service.");
+      }
+    } catch (err: any) {
+      console.error("Failed to generate long summary:", err);
+      setLongSummaryErrors(prev => ({ ...prev, [video.id]: err.message || "Unknown summary error" }));
+    } finally {
+      setLoadingLongSummaries(prev => ({ ...prev, [video.id]: false }));
     }
   };
 
@@ -753,7 +1003,7 @@ export default function App() {
   // Process and filter loaded videos on client side for responsive search/keyword interaction
   const getFilteredVideos = () => {
     if (!data || !data.videos) return [];
-    return data.videos.filter(video => {
+    const filtered = data.videos.filter(video => {
       // Platform Match
       if (selectedPlatformFilter !== "All" && video.platform.toLowerCase() !== selectedPlatformFilter.toLowerCase()) {
         return false;
@@ -770,10 +1020,6 @@ export default function App() {
       if (video.sentimentScore < minSentiment || video.sentimentScore > maxSentiment) {
         return false;
       }
-      // Channel Name Filter
-      if (selectedChannelFilter !== "All" && video.uploader !== selectedChannelFilter) {
-        return false;
-      }
       // Trending Keyword Tag Match
       if (selectedKeyword && !video.title.toLowerCase().includes(selectedKeyword.toLowerCase()) && !video.summary.toLowerCase().includes(selectedKeyword.toLowerCase())) {
         return false;
@@ -788,16 +1034,23 @@ export default function App() {
       }
       return true;
     });
+
+    // Sort and limit if Top 10 by Sentiment is active
+    if (showOnlyTop10BySentiment) {
+      return [...filtered]
+        .sort((a, b) => {
+          // Calculate sentiment intensity weighted by engagement (views + likes * 2)
+          const weightA = Math.abs(a.sentimentScore) * (a.views + a.likes * 2);
+          const weightB = Math.abs(b.sentimentScore) * (b.views + b.likes * 2);
+          return weightB - weightA;
+        })
+        .slice(0, 10);
+    }
+
+    return filtered;
   };
 
   const filteredVideos = getFilteredVideos();
-
-  // Dynamic list of unique channel names / uploaders from loaded data
-  const channelNames = React.useMemo(() => {
-    if (!data || !data.videos) return [];
-    const unique = new Set(data.videos.map(v => v.uploader));
-    return Array.from(unique).sort();
-  }, [data]);
 
   // Helper to export filtered/sorted list to Excel (CSV format with Blob encoding and Byte Order Mark for robust Excel viewing)
   const exportCategoryToExcel = (categoryName: string, videosToExport: any[]) => {
@@ -843,64 +1096,65 @@ export default function App() {
     URL.revokeObjectURL(url);
   };
 
-  // Color scheme helpers based on category
-  const getCategoryColor = (cat: string) => {
-    switch (cat) {
-      case "political":
-        return {
-          bg: "bg-purple-50",
-          border: "border-purple-200",
-          text: "text-purple-700",
-          badge: "bg-purple-50 text-purple-700 border-purple-200"
-        };
-      case "history":
-        return {
-          bg: "bg-amber-50",
-          border: "border-amber-200",
-          text: "text-amber-700",
-          badge: "bg-amber-50 text-amber-700 border-amber-200"
-        };
-      case "sports":
-        return {
-          bg: "bg-emerald-50",
-          border: "border-emerald-200",
-          text: "text-emerald-700",
-          badge: "bg-emerald-50 text-emerald-700 border-emerald-200"
-        };
-      default:
-        return {
-          bg: "bg-slate-50",
-          border: "border-slate-200",
-          text: "text-slate-700",
-          badge: "bg-slate-50 text-slate-700"
-        };
+  // Helper to download currently filtered dashboard videos as CSV
+  const handleDownloadCSVReport = () => {
+    if (!filteredVideos || filteredVideos.length === 0) {
+      setShareToast({
+        message: "No video data available to download.",
+        type: "error"
+      });
+      return;
     }
+
+    const annotatedVideos = filteredVideos
+      .map((v) => {
+        const trendScore = Math.round(
+          (v.views * 0.4 + v.likes * 2.0) * (v.sentimentScore >= 0 ? 1 + v.sentimentScore : 1) * (v.mlConfidence || 1)
+        );
+        return { ...v, trendScore };
+      })
+      .sort((a, b) => b.trendScore - a.trendScore)
+      .map((v, index) => ({ ...v, rank: index + 1 }));
+
+    exportCategoryToExcel("filtered_dashboard_report", annotatedVideos);
+    setShareToast({
+      message: "Successfully downloaded filtered CSV report!",
+      type: "success"
+    });
   };
 
   // Color scheme helpers based on platform
-  const getPlatformIconAndStyle = (platform: "YouTube" | "Facebook" | "Instagram") => {
-    switch (platform) {
-      case "YouTube":
-        return {
-          icon: <Youtube className="w-4 h-4" />,
-          text: "text-red-600",
-          border: "border-red-200",
-          badge: "bg-red-50 text-red-700 border-red-100"
-        };
-      case "Facebook":
-        return {
-          icon: <Facebook className="w-4 h-4" />,
-          text: "text-blue-600",
-          border: "border-blue-200",
-          badge: "bg-blue-50 text-blue-700 border-blue-100"
-        };
-      case "Instagram":
-        return {
-          icon: <Instagram className="w-4 h-4" />,
-          text: "text-pink-600",
-          border: "border-pink-200",
-          badge: "bg-pink-50 text-pink-700 border-pink-100"
-        };
+  const getPlatformIconAndStyle = (platform: string) => {
+    const norm = (platform || "").toLowerCase();
+    if (norm.includes("youtube")) {
+      return {
+        icon: <Youtube className="w-4 h-4" />,
+        text: "text-red-600",
+        border: "border-red-200",
+        badge: "bg-red-50 text-red-700 border-red-100"
+      };
+    } else if (norm.includes("facebook")) {
+      return {
+        icon: <Facebook className="w-4 h-4" />,
+        text: "text-blue-600",
+        border: "border-blue-200",
+        badge: "bg-blue-50 text-blue-700 border-blue-100"
+      };
+    } else if (norm.includes("instagram")) {
+      return {
+        icon: <Instagram className="w-4 h-4" />,
+        text: "text-pink-600",
+        border: "border-pink-200",
+        badge: "bg-pink-50 text-pink-700 border-pink-100"
+      };
+    } else {
+      // Elegant, robust dynamic fallback for any other platform (e.g. TikTok, Twitter, LinkedIn, etc.)
+      return {
+        icon: <VideoIcon className="w-4 h-4" />,
+        text: "text-indigo-600",
+        border: "border-indigo-200",
+        badge: "bg-indigo-50 text-indigo-700 border-indigo-100"
+      };
     }
   };
 
@@ -953,17 +1207,23 @@ export default function App() {
       : 0.00;
 
     // Platform breakdown
-    const platforms = { youtube: 0, facebook: 0, instagram: 0 };
+    const platforms: Record<string, number> = {};
     catVideos.forEach(v => {
-      if (v.platform === "YouTube") platforms.youtube++;
-      else if (v.platform === "Facebook") platforms.facebook++;
-      else if (v.platform === "Instagram") platforms.instagram++;
+      const plat = (v.platform || "Unknown").trim();
+      const norm = plat.toLowerCase() === "youtube" ? "YouTube" :
+                   plat.toLowerCase() === "facebook" ? "Facebook" :
+                   plat.toLowerCase() === "instagram" ? "Instagram" :
+                   plat.charAt(0).toUpperCase() + plat.slice(1);
+      platforms[norm] = (platforms[norm] || 0) + 1;
     });
     let dominantPlatform = "None";
     let maxCount = -1;
-    if (platforms.youtube > maxCount) { dominantPlatform = "YouTube"; maxCount = platforms.youtube; }
-    if (platforms.facebook > maxCount) { dominantPlatform = "Facebook"; maxCount = platforms.facebook; }
-    if (platforms.instagram > maxCount) { dominantPlatform = "Instagram"; maxCount = platforms.instagram; }
+    Object.entries(platforms).forEach(([plat, count]) => {
+      if (count > maxCount) {
+        maxCount = count;
+        dominantPlatform = plat;
+      }
+    });
 
     // Engagement Score
     const avgTrendScore = totalVideos > 0
@@ -1097,6 +1357,40 @@ export default function App() {
               <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse"></span>
               Live ML Model Server Active
             </span>
+            
+            {/* Auto-Refresh Toggle */}
+            <div className="flex items-center gap-2 bg-white border border-slate-200 px-3 py-1.5 rounded-lg shadow-sm">
+              <label htmlFor="auto-refresh-toggle" className="text-xs font-medium text-slate-600 flex items-center gap-1.5 cursor-pointer select-none">
+                <span className="relative flex h-2 w-2">
+                  <span className={`animate-ping absolute inline-flex h-full w-full rounded-full opacity-75 ${autoRefreshEnabled ? "bg-indigo-400" : "bg-slate-300"}`}></span>
+                  <span className={`relative inline-flex rounded-full h-2 w-2 ${autoRefreshEnabled ? "bg-indigo-500" : "bg-slate-400"}`}></span>
+                </span>
+                Auto-Refresh
+              </label>
+              <button
+                id="auto-refresh-toggle"
+                type="button"
+                role="switch"
+                aria-checked={autoRefreshEnabled}
+                onClick={() => setAutoRefreshEnabled(!autoRefreshEnabled)}
+                className={`relative inline-flex h-5 w-9 shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-none ${
+                  autoRefreshEnabled ? "bg-indigo-600" : "bg-slate-200"
+                }`}
+              >
+                <span
+                  aria-hidden="true"
+                  className={`pointer-events-none inline-block h-4 w-4 transform rounded-full bg-white shadow ring-0 transition duration-200 ease-in-out ${
+                    autoRefreshEnabled ? "translate-x-4" : "translate-x-0"
+                  }`}
+                />
+              </button>
+              {autoRefreshEnabled && (
+                <span className="text-[10px] font-mono text-indigo-600 font-bold bg-indigo-50 px-1.5 py-0.5 rounded border border-indigo-100/50 animate-pulse">
+                  {formatTime(secondsUntilRefresh)}
+                </span>
+              )}
+            </div>
+
             <button
               onClick={() => setRefreshTrigger(prev => prev + 1)}
               className="px-3.5 py-1.5 bg-white hover:bg-slate-50 text-xs text-slate-700 font-medium rounded-lg border border-slate-200 hover:border-slate-300 shadow-sm transition flex items-center gap-2"
@@ -1247,84 +1541,140 @@ export default function App() {
               </div>
             </div>
 
-            {/* Channel/Creator Filter */}
-            <div className="space-y-2">
-              <label className="text-xs font-semibold text-slate-500 flex items-center gap-1">
-                <User className="w-3.5 h-3.5 text-slate-400" />
-                Target Channel / Creator
-              </label>
-              <select
-                value={selectedChannelFilter}
-                onChange={(e) => setSelectedChannelFilter(e.target.value)}
-                className="w-full bg-white border border-slate-200 text-slate-700 rounded-lg p-2 focus:outline-none text-xs shadow-sm focus:ring-1 focus:ring-indigo-500 focus:border-indigo-500 transition-colors"
-              >
-                <option value="All">All Channels ({channelNames.length})</option>
-                {channelNames.map((name) => (
-                  <option key={name} value={name}>
-                    {name}
-                  </option>
-                ))}
-              </select>
-            </div>
-
-            {/* Target Niche Categories */}
+            {/* Target Categories */}
             <div className="space-y-2">
               <label className="text-xs font-semibold text-slate-500 flex items-center gap-1">
                 <Sliders className="w-3.5 h-3.5" />
-                Target Niche Topics
+                Target Categories
               </label>
               <div className="space-y-2 pt-1">
-                <button
-                  onClick={() => handleCategoryToggle("political")}
-                  className={`w-full flex items-center justify-between p-2 rounded-lg border text-xs transition ${
-                    selectedCategories.includes("political")
+                {selectedCategories.map((cat) => {
+                  const c = cat.toLowerCase();
+                  let icon = <Sparkles className="w-3.5 h-3.5" />;
+                  let bgStyle = "bg-blue-50 border-blue-200 text-blue-700";
+                  let checkBg = "bg-blue-600 border-blue-500 text-white";
+                  let labelName = cat.charAt(0).toUpperCase() + cat.slice(1);
+
+                  if (c === "political") {
+                    icon = <Award className="w-3.5 h-3.5" />;
+                    bgStyle = selectedCategories.includes("political")
                       ? "bg-purple-50 border-purple-200 text-purple-700"
-                      : "bg-white border-slate-200 text-slate-600 hover:border-slate-300"
-                  }`}
-                >
-                  <span className="flex items-center gap-2">
-                    <Award className="w-3.5 h-3.5" />
-                    Political & Civics
-                  </span>
-                  <span className={`w-4 h-4 rounded flex items-center justify-center border ${selectedCategories.includes("political") ? "bg-purple-600 border-purple-500 text-white" : "border-slate-300"}`}>
-                    {selectedCategories.includes("political") && <Check className="w-3 h-3" />}
-                  </span>
-                </button>
-
-                <button
-                  onClick={() => handleCategoryToggle("history")}
-                  className={`w-full flex items-center justify-between p-2 rounded-lg border text-xs transition ${
-                    selectedCategories.includes("history")
+                      : "bg-white border-slate-200 text-slate-600 hover:border-slate-300";
+                    checkBg = "bg-purple-600 border-purple-500 text-white";
+                    labelName = "Political & Civics";
+                  } else if (c === "history") {
+                    icon = <BookOpen className="w-3.5 h-3.5" />;
+                    bgStyle = selectedCategories.includes("history")
                       ? "bg-amber-50 border-amber-200 text-amber-700"
-                      : "bg-white border-slate-200 text-slate-600 hover:border-slate-300"
-                  }`}
-                >
-                  <span className="flex items-center gap-2">
-                    <BookOpen className="w-3.5 h-3.5" />
-                    History & Heritage
-                  </span>
-                  <span className={`w-4 h-4 rounded flex items-center justify-center border ${selectedCategories.includes("history") ? "bg-amber-600 border-amber-500 text-white" : "border-slate-300"}`}>
-                    {selectedCategories.includes("history") && <Check className="w-3 h-3" />}
-                  </span>
-                </button>
-
-                <button
-                  onClick={() => handleCategoryToggle("sports")}
-                  className={`w-full flex items-center justify-between p-2 rounded-lg border text-xs transition ${
-                    selectedCategories.includes("sports")
+                      : "bg-white border-slate-200 text-slate-600 hover:border-slate-300";
+                    checkBg = "bg-amber-600 border-amber-500 text-white";
+                    labelName = "History & Heritage";
+                  } else if (c === "sports") {
+                    icon = <Tv className="w-3.5 h-3.5" />;
+                    bgStyle = selectedCategories.includes("sports")
                       ? "bg-emerald-50 border-emerald-200 text-emerald-700"
-                      : "bg-white border-slate-200 text-slate-600 hover:border-slate-300"
-                  }`}
-                >
-                  <span className="flex items-center gap-2">
-                    <Tv className="w-3.5 h-3.5" />
-                    Sports & Athletics
-                  </span>
-                  <span className={`w-4 h-4 rounded flex items-center justify-center border ${selectedCategories.includes("sports") ? "bg-emerald-600 border-emerald-500 text-white" : "border-slate-300"}`}>
-                    {selectedCategories.includes("sports") && <Check className="w-3 h-3" />}
-                  </span>
-                </button>
+                      : "bg-white border-slate-200 text-slate-600 hover:border-slate-300";
+                    checkBg = "bg-emerald-600 border-emerald-500 text-white";
+                    labelName = "Sports & Athletics";
+                  } else {
+                    bgStyle = selectedCategories.includes(c)
+                      ? "bg-sky-50 border-sky-200 text-sky-700 font-medium"
+                      : "bg-white border-slate-200 text-slate-600 hover:border-slate-300";
+                    checkBg = "bg-sky-600 border-sky-500 text-white";
+                  }
+
+                  const isSelected = selectedCategories.includes(c);
+
+                  return (
+                    <div key={c} className="group relative">
+                      <button
+                        onClick={() => handleCategoryToggle(c)}
+                        className={`w-full flex items-center justify-between p-2 rounded-lg border text-xs transition ${bgStyle}`}
+                      >
+                        <span className="flex items-center gap-2 truncate pr-6">
+                          {icon}
+                          <span className="truncate">{labelName}</span>
+                        </span>
+                        <span className={`w-4 h-4 rounded flex items-center justify-center border shrink-0 ${isSelected ? checkBg : "border-slate-300"}`}>
+                          {isSelected && <Check className="w-3 h-3" />}
+                        </span>
+                      </button>
+                      
+                      {/* Allow deleting custom category */}
+                      {c !== "political" && c !== "history" && c !== "sports" && (
+                        <button
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            setSelectedCategories(prev => prev.filter(item => item !== c));
+                            if (selectedCategoryFilter === c) {
+                              setSelectedCategoryFilter("All");
+                            }
+                          }}
+                          className="absolute right-8 top-1/2 -translate-y-1/2 p-1 text-slate-400 hover:text-red-500 rounded transition opacity-0 group-hover:opacity-100 bg-white shadow-sm border border-slate-200"
+                          title="Remove custom category"
+                        >
+                          <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+                          </svg>
+                        </button>
+                      )}
+                    </div>
+                  );
+                })}
               </div>
+            </div>
+
+            {/* AI Custom Niche Creator */}
+            <div className="bg-gradient-to-br from-indigo-50 to-slate-50 border border-indigo-100 rounded-xl p-4 space-y-3.5 shadow-sm">
+              <div className="flex items-center justify-between">
+                <span className="text-xs font-bold text-slate-800 flex items-center gap-1.5">
+                  <Sparkles className="w-3.5 h-3.5 text-indigo-500 animate-pulse" />
+                  AI Custom Niche Creator
+                </span>
+                <span className="bg-indigo-100 text-indigo-700 px-1.5 py-0.5 rounded text-[9px] font-bold font-mono">NEW</span>
+              </div>
+              <p className="text-[10.5px] text-slate-500 leading-relaxed">
+                Enter any topic (e.g., <code className="bg-white/80 px-1 py-0.5 rounded border border-slate-200">gaming</code>, <code className="bg-white/80 px-1 py-0.5 rounded border border-slate-200">finance</code>, <code className="bg-white/80 px-1 py-0.5 rounded border border-slate-200">cinema</code>, <code className="bg-white/80 px-1 py-0.5 rounded border border-slate-200">cooking</code>) to dynamically search-ground and classify real-time video feeds.
+              </p>
+              
+              <form onSubmit={(e) => {
+                e.preventDefault();
+                const formData = new FormData(e.currentTarget);
+                const rawNiche = (formData.get("newNiche") as string || "").trim();
+                if (!rawNiche) return;
+                
+                const normNiche = rawNiche.toLowerCase().replace(/[^a-z0-9]/g, "");
+                if (normNiche.length === 0) return;
+                
+                if (selectedCategories.includes(normNiche)) {
+                  alert("This category already exists!");
+                  return;
+                }
+                
+                setSelectedCategories(prev => [...prev, normNiche]);
+                setSelectedCategoryFilter(normNiche);
+                e.currentTarget.reset();
+              }} className="space-y-2">
+                <div className="relative">
+                  <input
+                    type="text"
+                    name="newNiche"
+                    placeholder="Enter custom niche (e.g. gaming)..."
+                    className="w-full pl-2.5 pr-8 py-1.5 bg-white border border-slate-200 text-slate-700 rounded-lg focus:outline-none focus:ring-1 focus:ring-indigo-500 text-xs shadow-sm"
+                    maxLength={20}
+                  />
+                  <div className="absolute right-2.5 top-1/2 -translate-y-1/2 text-[10px] text-slate-400 font-mono">
+                    ↵
+                  </div>
+                </div>
+                <button
+                  type="submit"
+                  className="w-full py-1.5 bg-indigo-600 hover:bg-indigo-700 text-white font-bold rounded-lg text-xs transition shadow-sm flex items-center justify-center gap-1.5"
+                >
+                  <Plus className="w-3.5 h-3.5" />
+                  Summon AI Custom Niche
+                </button>
+              </form>
             </div>
 
             {/* Semantic Processing explanation */}
@@ -2064,6 +2414,25 @@ export default function App() {
                       </div>
                     )}
 
+                    {/* Custom Alert Label Input */}
+                    <div className="space-y-1">
+                      <label className="text-[11px] font-bold text-slate-600 uppercase font-mono flex items-center gap-1">
+                        <Tag className="w-3.5 h-3.5 text-indigo-500" />
+                        Custom Rule Label (Optional)
+                      </label>
+                      <input
+                        type="text"
+                        value={newAlertLabel}
+                        onChange={(e) => setNewAlertLabel(e.target.value)}
+                        placeholder="e.g. TN Election Alert, Sports Spike Watcher"
+                        className="w-full border border-slate-200 rounded-lg p-2 text-xs focus:outline-none focus:border-indigo-500 bg-white font-medium"
+                        maxLength={40}
+                      />
+                      <span className="text-[9px] text-slate-400 font-mono block leading-tight">
+                        Assigned to identify this warning rule definition and customize dispatch log entries.
+                      </span>
+                    </div>
+
                     <button
                       type="button"
                       onClick={handleRegisterAlert}
@@ -2142,9 +2511,62 @@ export default function App() {
                                 </div>
                               </div>
 
-                              <div className="text-sm font-bold text-slate-800 font-display">
-                                {alert.type === "keyword" ? `"${alert.targetValue}"` : alert.targetValue.toUpperCase()}
+                              <div className="text-sm font-bold text-slate-800 font-display flex items-center justify-between">
+                                <span>{alert.type === "keyword" ? `"${alert.targetValue}"` : alert.targetValue.toUpperCase()}</span>
                               </div>
+
+                              {/* Inline Custom Alert Label View & Edit */}
+                              {editingAlertId === alert.id ? (
+                                <div className="flex items-center gap-1 mt-1 bg-indigo-50/50 p-1 rounded-lg border border-indigo-100">
+                                  <input
+                                    type="text"
+                                    value={editingAlertLabel}
+                                    onChange={(e) => setEditingAlertLabel(e.target.value)}
+                                    placeholder="Add custom label..."
+                                    className="flex-grow border border-indigo-200 rounded px-1.5 py-0.5 text-[11px] focus:outline-none focus:ring-1 focus:ring-indigo-500 bg-white font-medium"
+                                    maxLength={40}
+                                    autoFocus
+                                    onKeyDown={(e) => {
+                                      if (e.key === "Enter") {
+                                        handleUpdateAlertLabel(alert.id, editingAlertLabel);
+                                      } else if (e.key === "Escape") {
+                                        setEditingAlertId(null);
+                                      }
+                                    }}
+                                  />
+                                  <button
+                                    onClick={() => handleUpdateAlertLabel(alert.id, editingAlertLabel)}
+                                    className="p-1 text-emerald-600 hover:bg-emerald-50 rounded transition shrink-0"
+                                    title="Save custom label"
+                                  >
+                                    <Check className="w-3.5 h-3.5" />
+                                  </button>
+                                  <button
+                                    onClick={() => setEditingAlertId(null)}
+                                    className="p-1 text-red-600 hover:bg-red-50 rounded transition shrink-0"
+                                    title="Cancel"
+                                  >
+                                    <X className="w-3.5 h-3.5" />
+                                  </button>
+                                </div>
+                              ) : (
+                                <div className="flex items-center justify-between group/label mt-1 bg-slate-50 border border-slate-100 px-2 py-1 rounded-lg hover:border-slate-200 transition">
+                                  <span className={`text-[10.5px] font-semibold flex items-center gap-1.5 truncate max-w-[170px] ${alert.label ? 'text-indigo-700 font-bold' : 'text-slate-400 italic'}`}>
+                                    <Tag className="w-3 h-3 text-indigo-400 shrink-0" />
+                                    <span className="truncate">{alert.label || "No custom label"}</span>
+                                  </span>
+                                  <button
+                                    onClick={() => {
+                                      setEditingAlertId(alert.id);
+                                      setEditingAlertLabel(alert.label || "");
+                                    }}
+                                    className="p-1 text-slate-400 hover:text-indigo-600 rounded transition opacity-0 group-hover/label:opacity-100 focus:opacity-100"
+                                    title="Set or update custom label"
+                                  >
+                                    <Edit2 className="w-3 h-3" />
+                                  </button>
+                                </div>
+                              )}
 
                               <div className="text-xs text-slate-500 space-y-1">
                                 <p className="flex items-center gap-1 font-semibold text-slate-600">
@@ -2282,17 +2704,23 @@ export default function App() {
 
                 {/* Metric 3: Top Platform */}
                 {(() => {
-                  const { platformBreakdown } = data.analytics;
-                  const maxVal = Math.max(platformBreakdown.youtube, platformBreakdown.facebook, platformBreakdown.instagram);
+                  const breakdown = data.analytics.platformBreakdown || {};
                   let topPlatform = "YouTube";
-                  let topColor = "text-red-600";
-                  if (maxVal === platformBreakdown.facebook) {
-                    topPlatform = "Facebook";
-                    topColor = "text-blue-600";
-                  } else if (maxVal === platformBreakdown.instagram) {
-                    topPlatform = "Instagram";
-                    topColor = "text-pink-600";
-                  }
+                  let maxVal = -1;
+                  
+                  Object.entries(breakdown).forEach(([key, val]) => {
+                    const count = Number(val) || 0;
+                    if (count > maxVal) {
+                      maxVal = count;
+                      topPlatform = key.toLowerCase() === "youtube" ? "YouTube" :
+                                    key.toLowerCase() === "facebook" ? "Facebook" :
+                                    key.toLowerCase() === "instagram" ? "Instagram" :
+                                    key.charAt(0).toUpperCase() + key.slice(1);
+                    }
+                  });
+
+                  const style = getPlatformIconAndStyle(topPlatform);
+                  const topColor = style.text;
 
                   return (
                     <div className="bg-white rounded-xl border border-slate-200 p-5 space-y-2 relative overflow-hidden group shadow-sm">
@@ -2443,57 +2871,50 @@ export default function App() {
                     <div className="flex flex-col justify-center p-4 bg-slate-50 rounded-xl border border-slate-200 space-y-3">
                       <span className="text-[10px] font-mono uppercase text-slate-500 tracking-wider block text-center mb-1 font-bold">Platform Share</span>
                       
-                      {/* YouTube Share Bar */}
                       {(() => {
-                        const { youtube, facebook, instagram } = data.analytics.platformBreakdown;
-                        const total = youtube + facebook + instagram || 1;
-                        const ytPct = Math.round((youtube / total) * 100);
-                        const fbPct = Math.round((facebook / total) * 100);
-                        const igPct = Math.round((instagram / total) * 100);
+                        const breakdown = data.analytics.platformBreakdown || {};
+                        const total = (Object.values(breakdown) as number[]).reduce((sum: number, val: number) => sum + (val || 0), 0) || 1;
+
+                        const entries = Object.entries(breakdown).map(([plat, count]) => {
+                          const displayPlat = plat.toLowerCase() === "youtube" ? "YouTube" :
+                                              plat.toLowerCase() === "facebook" ? "Facebook" :
+                                              plat.toLowerCase() === "instagram" ? "Instagram" :
+                                              plat.charAt(0).toUpperCase() + plat.slice(1);
+                          const countNum = Number(count) || 0;
+                          const pct = Math.round((countNum / total) * 100);
+                          const style = getPlatformIconAndStyle(displayPlat);
+                          return {
+                            plat,
+                            displayPlat,
+                            count: countNum,
+                            pct,
+                            style
+                          };
+                        }).sort((a, b) => b.count - a.count);
 
                         return (
                           <div className="space-y-2.5">
-                            {/* YT */}
-                            <div className="space-y-1">
-                              <div className="flex items-center justify-between text-[11px] font-mono text-slate-700">
-                                <span className="flex items-center gap-1 font-semibold">
-                                  <Youtube className="w-3.5 h-3.5 text-red-600" />
-                                  YouTube
-                                </span>
-                                <span className="font-bold">{youtube} ({ytPct}%)</span>
-                              </div>
-                              <div className="h-2 bg-slate-200/70 rounded-full overflow-hidden border border-slate-200/50">
-                                <div className="h-full bg-red-500 rounded-full transition-all duration-1000" style={{ width: `${ytPct}%` }}></div>
-                              </div>
-                            </div>
+                            {entries.map(({ plat, displayPlat, count, pct, style }) => {
+                              let barBg = "bg-indigo-500";
+                              if (displayPlat === "YouTube") barBg = "bg-red-500";
+                              else if (displayPlat === "Facebook") barBg = "bg-blue-500";
+                              else if (displayPlat === "Instagram") barBg = "bg-gradient-to-r from-pink-500 via-purple-500 to-amber-500";
 
-                            {/* FB */}
-                            <div className="space-y-1">
-                              <div className="flex items-center justify-between text-[11px] font-mono text-slate-700">
-                                <span className="flex items-center gap-1 font-semibold">
-                                  <Facebook className="w-3.5 h-3.5 text-blue-600" />
-                                  Facebook
-                                </span>
-                                <span className="font-bold">{facebook} ({fbPct}%)</span>
-                              </div>
-                              <div className="h-2 bg-slate-200/70 rounded-full overflow-hidden border border-slate-200/50">
-                                <div className="h-full bg-blue-500 rounded-full transition-all duration-1000" style={{ width: `${fbPct}%` }}></div>
-                              </div>
-                            </div>
-
-                            {/* IG */}
-                            <div className="space-y-1">
-                              <div className="flex items-center justify-between text-[11px] font-mono text-slate-700">
-                                <span className="flex items-center gap-1 font-semibold">
-                                  <Instagram className="w-3.5 h-3.5 text-pink-600" />
-                                  Instagram
-                                </span>
-                                <span className="font-bold">{instagram} ({igPct}%)</span>
-                              </div>
-                              <div className="h-2 bg-slate-200/70 rounded-full overflow-hidden border border-slate-200/50">
-                                <div className="h-full bg-gradient-to-r from-pink-500 via-purple-500 to-amber-500 rounded-full transition-all duration-1000" style={{ width: `${igPct}%` }}></div>
-                              </div>
-                            </div>
+                              return (
+                                <div key={plat} className="space-y-1">
+                                  <div className="flex items-center justify-between text-[11px] font-mono text-slate-700">
+                                    <span className="flex items-center gap-1 font-semibold">
+                                      <span className={style.text}>{style.icon}</span>
+                                      {displayPlat}
+                                    </span>
+                                    <span className="font-bold">{count} ({pct}%)</span>
+                                  </div>
+                                  <div className="h-2 bg-slate-200/70 rounded-full overflow-hidden border border-slate-200/50">
+                                    <div className={`h-full rounded-full transition-all duration-1000 ${barBg}`} style={{ width: `${pct}%` }}></div>
+                                  </div>
+                                </div>
+                              );
+                            })}
                           </div>
                         );
                       })()}
@@ -2517,43 +2938,32 @@ export default function App() {
                   </div>
 
                   {/* Niche Category Progress Bars */}
-                  <div className="space-y-2.5 bg-slate-50 p-4 rounded-xl border border-slate-200">
+                  <div className="space-y-2.5 bg-slate-50 p-4 rounded-xl border border-slate-200 font-sans">
                     <span className="text-[10px] font-mono uppercase text-slate-500 tracking-wider block text-center mb-1 font-bold">Topic Dominance</span>
                     {(() => {
-                      const { political, history, sports } = data.analytics.categoryBreakdown;
-                      const total = political + history + sports || 1;
-                      const polPct = Math.round((political / total) * 100);
-                      const hisPct = Math.round((history / total) * 100);
-                      const spoPct = Math.round((sports / total) * 100);
-
+                      const breakdown = data.analytics.categoryBreakdown || {};
+                      const total = (Object.values(breakdown).reduce((sum: number, val: any) => sum + (Number(val) || 0), 0) || 1) as number;
+                      
                       return (
                         <div className="space-y-2 text-[11px] font-mono text-slate-700">
-                          {/* Political */}
-                          <div className="flex items-center gap-2">
-                            <span className="w-20 text-purple-700 font-semibold">Political</span>
-                            <div className="flex-grow h-2.5 bg-slate-200/70 border border-slate-200/50 rounded-md overflow-hidden relative">
-                              <div className="h-full bg-purple-500 rounded-full transition-all duration-1000" style={{ width: `${polPct}%` }}></div>
-                            </div>
-                            <span className="w-12 text-right font-bold">{polPct}%</span>
-                          </div>
-
-                          {/* History */}
-                          <div className="flex items-center gap-2">
-                            <span className="w-20 text-amber-700 font-semibold">History</span>
-                            <div className="flex-grow h-2.5 bg-slate-200/70 border border-slate-200/50 rounded-md overflow-hidden relative">
-                              <div className="h-full bg-amber-500 rounded-full transition-all duration-1000" style={{ width: `${hisPct}%` }}></div>
-                            </div>
-                            <span className="w-12 text-right font-bold">{hisPct}%</span>
-                          </div>
-
-                          {/* Sports */}
-                          <div className="flex items-center gap-2">
-                            <span className="w-20 text-emerald-700 font-semibold">Sports</span>
-                            <div className="flex-grow h-2.5 bg-slate-200/70 border border-slate-200/50 rounded-md overflow-hidden relative">
-                              <div className="h-full bg-emerald-500 rounded-full transition-all duration-1000" style={{ width: `${spoPct}%` }}></div>
-                            </div>
-                            <span className="w-12 text-right font-bold">{spoPct}%</span>
-                          </div>
+                          {Object.entries(breakdown).map(([cat, count]) => {
+                            const countNum = Number(count) || 0;
+                            const pct = Math.round((countNum / total) * 100);
+                            const colors = getCategoryColor(cat);
+                            const displayName = cat === "political" ? "Political" :
+                                                cat === "history" ? "History" :
+                                                cat === "sports" ? "Sports" :
+                                                cat.charAt(0).toUpperCase() + cat.slice(1);
+                            return (
+                              <div key={cat} className="flex items-center gap-2">
+                                <span className={`w-20 ${colors.text} font-semibold truncate`} title={displayName}>{displayName}</span>
+                                <div className="flex-grow h-2.5 bg-slate-200/70 border border-slate-200/50 rounded-md overflow-hidden relative">
+                                  <div className={`h-full ${colors.barBg} rounded-full transition-all duration-1000`} style={{ width: `${pct}%` }}></div>
+                                </div>
+                                <span className="w-12 text-right font-bold">{pct}%</span>
+                              </div>
+                            );
+                          })}
                         </div>
                       );
                     })()}
@@ -2606,9 +3016,9 @@ export default function App() {
                     </p>
                   </div>
 
-                  {/* Niche Focus Selector */}
+                  {/* Category Focus Selector */}
                   <div className="flex flex-wrap items-center gap-1.5">
-                    <span className="text-[10px] font-mono text-slate-400 font-bold uppercase mr-1">Focus Niche:</span>
+                    <span className="text-[10px] font-mono text-slate-400 font-bold uppercase mr-1">Focus Category:</span>
                     <button
                       onClick={() => setTrendCategory("all")}
                       className={`px-2.5 py-1 text-xs font-semibold rounded-lg transition border ${
@@ -2617,7 +3027,7 @@ export default function App() {
                           : "bg-slate-50 border-slate-200 text-slate-600 hover:bg-slate-100"
                       }`}
                     >
-                      All Topics
+                      All Categories
                     </button>
                     <button
                       onClick={() => setTrendCategory("political")}
@@ -3136,11 +3546,16 @@ export default function App() {
                 {/* Search & Mini filters header */}
                 <div className="flex flex-col sm:flex-row gap-3 items-center justify-between pb-2">
                   <div>
-                    <h3 className="text-base font-bold font-display text-slate-800">
-                      Classified Videos Feed
+                    <h3 className="text-base font-bold font-display text-slate-800 flex items-center gap-2">
+                      <span>Classified Videos Feed</span>
+                      {showOnlyTop10BySentiment && (
+                        <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] bg-indigo-100 text-indigo-700 font-bold uppercase tracking-wider animate-pulse">
+                          Top 10 Sentiment Trends Active
+                        </span>
+                      )}
                     </h3>
                     <p className="text-xs text-slate-500">
-                      Found {filteredVideos.length} of {data.videos.length} total videos match criteria
+                      Found {filteredVideos.length} of {data.videos.length} total videos match criteria {showOnlyTop10BySentiment ? "(Showing top 10 by sentiment intensity)" : ""}
                     </p>
                   </div>
 
@@ -3157,36 +3572,164 @@ export default function App() {
                   </div>
                 </div>
 
+                {/* PLATFORM SENTIMENT DISTRIBUTION WIDGET */}
+                <div className="bg-white p-4 rounded-xl border border-slate-200/80 shadow-sm space-y-3">
+                  <div className="flex items-center justify-between">
+                    <h4 className="text-xs font-bold uppercase tracking-wider text-slate-700 font-sans flex items-center gap-1.5">
+                      <Activity className="w-4 h-4 text-slate-500" />
+                      Platform Sentiment Breakdown
+                    </h4>
+                    <span className="text-[10px] text-slate-400 font-mono font-bold">Updated Live</span>
+                  </div>
+                  <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+                    {["YouTube", "Facebook", "Instagram"].map(plat => {
+                      const platVideos = (data?.videos || []).filter(v => v.platform.toLowerCase() === plat.toLowerCase());
+                      const total = platVideos.length;
+                      const positive = platVideos.filter(v => v.sentimentLabel === "Positive").length;
+                      const negative = platVideos.filter(v => v.sentimentLabel === "Negative").length;
+                      const neutral = platVideos.filter(v => v.sentimentLabel === "Neutral").length;
+                      
+                      const posPct = total > 0 ? Math.round((positive / total) * 100) : 0;
+                      const negPct = total > 0 ? Math.round((negative / total) * 100) : 0;
+                      const neuPct = total > 0 ? Math.round((neutral / total) * 100) : 0;
+                      
+                      const platformStyles = getPlatformIconAndStyle(plat);
+
+                      return (
+                        <div key={plat} className="p-3 bg-slate-50 rounded-lg border border-slate-150 flex flex-col justify-between space-y-2">
+                          <div className="flex items-center justify-between">
+                            <span className={`inline-flex items-center gap-1.5 px-2 py-0.5 rounded-md border text-[10px] font-bold uppercase tracking-wider ${platformStyles.badge}`}>
+                              {platformStyles.icon}
+                              {plat}
+                            </span>
+                            <span className="text-[10px] text-slate-500 font-mono font-bold">{total} Posts</span>
+                          </div>
+                          
+                          <div className="space-y-1.5">
+                            <div className="flex justify-between text-[10px] font-mono font-semibold text-slate-600">
+                              <span className="text-emerald-600 font-bold">Pos: {positive} ({posPct}%)</span>
+                              <span className="text-red-500 font-bold font-semibold">Neg: {negative} ({negPct}%)</span>
+                            </div>
+                            
+                            {/* Segmented sentiment progress bar */}
+                            <div className="h-2 bg-slate-200/70 border border-slate-200/50 rounded-full overflow-hidden flex">
+                              {positive > 0 && (
+                                <div 
+                                  className="h-full bg-emerald-500 transition-all duration-1000" 
+                                  style={{ width: `${posPct}%` }}
+                                  title={`${positive} Positive (${posPct}%)`}
+                                ></div>
+                              )}
+                              {neutral > 0 && (
+                                <div 
+                                  className="h-full bg-slate-400 transition-all duration-1000" 
+                                  style={{ width: `${neuPct}%` }}
+                                  title={`${neutral} Neutral (${neuPct}%)`}
+                                ></div>
+                              )}
+                              {negative > 0 && (
+                                <div 
+                                  className="h-full bg-red-500 transition-all duration-1000 animate-pulse" 
+                                  style={{ width: `${negPct}%` }}
+                                  title={`${negative} Negative (${negPct}%)`}
+                                ></div>
+                              )}
+                            </div>
+                            <div className="text-[9px] font-mono text-slate-400 text-center">
+                              {neutral} Neutral sentiments recorded
+                            </div>
+                          </div>
+                        </div>
+                      );
+                    })}
+                  </div>
+                </div>
+
                 {/* Grid controls for platform/sentiment */}
                 <div className="flex flex-wrap items-center gap-2 bg-slate-50 p-3 rounded-lg border border-slate-200 text-xs shadow-sm">
                   
-                  {/* Platform Quick Filter */}
-                  <div className="flex items-center gap-1.5 mr-4">
-                    <span className="text-slate-500 font-semibold">Platform:</span>
-                    <select
-                      value={selectedPlatformFilter}
-                      onChange={(e) => setSelectedPlatformFilter(e.target.value)}
-                      className="bg-white border border-slate-200 text-slate-700 rounded px-2 py-1 focus:outline-none text-xs shadow-sm"
+                  {/* Top 10 Sentiment Trends Toggle */}
+                  <div className="flex items-center gap-1.5 mr-2 border-r border-slate-200 pr-3">
+                    <button
+                      onClick={() => setShowOnlyTop10BySentiment(!showOnlyTop10BySentiment)}
+                      className={`px-2.5 py-1 text-xs font-bold rounded-md border transition flex items-center gap-1.5 shadow-sm cursor-pointer ${
+                        showOnlyTop10BySentiment
+                          ? "bg-indigo-600 text-white border-indigo-600 hover:bg-indigo-700"
+                          : "bg-white border-slate-200 text-slate-600 hover:bg-slate-50"
+                      }`}
+                      title="Toggle filtering and sorting of top 10 trending videos based on sentiment and engagement magnitude"
                     >
-                      <option value="All">All Platforms</option>
-                      <option value="YouTube">YouTube</option>
-                      <option value="Facebook">Facebook</option>
-                      <option value="Instagram">Instagram</option>
-                    </select>
+                      <Sparkles className={`w-3.5 h-3.5 ${showOnlyTop10BySentiment ? "animate-pulse text-yellow-300" : "text-indigo-500"}`} />
+                      <span>Top 10 Sentiment Trends</span>
+                    </button>
+                  </div>
+
+                  {/* Platform Quick Filter */}
+                  <div className="flex items-center gap-1.5 mr-4 flex-wrap">
+                    <span className="text-slate-500 font-semibold">Platform:</span>
+                    <button
+                      onClick={() => setSelectedPlatformFilter("All")}
+                      className={`px-2 py-1 text-xs font-semibold rounded-md border transition flex items-center gap-1 shadow-sm ${
+                        selectedPlatformFilter === "All"
+                          ? "bg-slate-800 text-white border-slate-800"
+                          : "bg-white border-slate-200 text-slate-600 hover:bg-slate-50"
+                      }`}
+                    >
+                      All
+                    </button>
+                    {(() => {
+                      const uniquePlatforms = Array.from(
+                        new Set(
+                          (data?.videos || []).map((v) => {
+                            const norm = (v.platform || "").trim();
+                            if (norm.toLowerCase() === "youtube") return "YouTube";
+                            if (norm.toLowerCase() === "facebook") return "Facebook";
+                            if (norm.toLowerCase() === "instagram") return "Instagram";
+                            return norm.charAt(0).toUpperCase() + norm.slice(1);
+                          })
+                        )
+                      ).filter(Boolean).sort() as string[];
+                      return uniquePlatforms.map((plat) => {
+                        const isSelected = selectedPlatformFilter.toLowerCase() === plat.toLowerCase();
+                        const style = getPlatformIconAndStyle(plat);
+                        return (
+                          <button
+                            key={plat}
+                            onClick={() => setSelectedPlatformFilter(plat)}
+                            className={`px-2 py-1 text-xs font-semibold rounded-md border transition flex items-center gap-1 shadow-sm ${
+                              isSelected
+                                ? `${style.badge} border-current ring-1 ring-current`
+                                : "bg-white border-slate-200 text-slate-600 hover:bg-slate-50"
+                            }`}
+                          >
+                            <span className={isSelected ? "" : style.text}>{style.icon}</span>
+                            <span>{plat}</span>
+                          </button>
+                        );
+                      });
+                    })()}
                   </div>
 
                   {/* Category Quick Filter */}
                   <div className="flex items-center gap-1.5 mr-4">
-                    <span className="text-slate-500 font-semibold">Niche:</span>
+                    <span className="text-slate-500 font-semibold">Category:</span>
                     <select
                       value={selectedCategoryFilter}
                       onChange={(e) => setSelectedCategoryFilter(e.target.value)}
-                      className="bg-white border border-slate-200 text-slate-700 rounded px-2 py-1 focus:outline-none text-xs shadow-sm"
+                      className="bg-white border border-slate-200 text-slate-700 rounded px-2 py-1 focus:outline-none text-xs shadow-sm capitalize"
                     >
                       <option value="All">All Categories</option>
-                      <option value="political">Political</option>
-                      <option value="history">History</option>
-                      <option value="sports">Sports</option>
+                      {selectedCategories.map((cat) => {
+                        const display = cat === "political" ? "Political" :
+                                        cat === "history" ? "History" :
+                                        cat === "sports" ? "Sports" :
+                                        cat.charAt(0).toUpperCase() + cat.slice(1);
+                        return (
+                          <option key={cat} value={cat}>
+                            {display}
+                          </option>
+                        );
+                      })}
                     </select>
                   </div>
 
@@ -3205,31 +3748,13 @@ export default function App() {
                     </select>
                   </div>
 
-                  {/* Channel Quick Filter */}
-                  <div className="flex items-center gap-1.5 mr-4">
-                    <span className="text-slate-500 font-semibold">Channel:</span>
-                    <select
-                      value={selectedChannelFilter}
-                      onChange={(e) => setSelectedChannelFilter(e.target.value)}
-                      className="bg-white border border-slate-200 text-slate-700 rounded px-2 py-1 focus:outline-none text-xs shadow-sm"
-                    >
-                      <option value="All">All Channels</option>
-                      {channelNames.map((name) => (
-                        <option key={name} value={name}>
-                          {name}
-                        </option>
-                      ))}
-                    </select>
-                  </div>
-
                   {/* Clear all filter states button */}
-                  {(selectedPlatformFilter !== "All" || selectedCategoryFilter !== "All" || selectedSentimentFilter !== "All" || selectedChannelFilter !== "All" || searchQuery !== "" || selectedKeyword || minSentiment !== -1.0 || maxSentiment !== 1.0) && (
+                  {(selectedPlatformFilter !== "All" || selectedCategoryFilter !== "All" || selectedSentimentFilter !== "All" || searchQuery !== "" || selectedKeyword || minSentiment !== -1.0 || maxSentiment !== 1.0) && (
                     <button
                       onClick={() => {
                         setSelectedPlatformFilter("All");
                         setSelectedCategoryFilter("All");
                         setSelectedSentimentFilter("All");
-                        setSelectedChannelFilter("All");
                         setSearchQuery("");
                         setSelectedKeyword(null);
                         setMinSentiment(-1.0);
@@ -3266,7 +3791,7 @@ export default function App() {
                               exit={{ opacity: 0, scale: 0.95 }}
                               transition={{ duration: 0.25 }}
                               onClick={() => setSelectedPreviewVideo(video)}
-                              className={`bg-white rounded-xl border p-5 hover:bg-slate-50/50 hover:border-blue-400 hover:shadow-md transition duration-200 flex flex-col justify-between space-y-4 cursor-pointer group relative ${
+                              className={`bg-white rounded-xl border p-5 hover:bg-slate-50/50 hover:border-blue-400 hover:shadow-md transition duration-200 flex flex-col justify-between space-y-4 cursor-pointer group relative max-h-[420px] overflow-y-auto custom-scrollbar ${
                                 isExpanded ? "border-blue-400 shadow-md ring-1 ring-blue-300/50" : "border-slate-200 shadow-sm"
                               }`}
                             >
@@ -3410,6 +3935,57 @@ export default function App() {
                                     </div>
                                   )}
                                 </div>
+                              </div>
+
+                              {/* GEMINI DETAILED SUMMARY EXPANDABLE PANEL */}
+                              <div className="pt-2 border-t border-slate-200/60" onClick={(e) => e.stopPropagation()}>
+                                {longSummaries[video.id] ? (
+                                  <div className="space-y-2 bg-indigo-50/40 p-3.5 rounded-lg border border-indigo-100/50 relative">
+                                    <div className="flex items-center justify-between">
+                                      <span className="text-[10px] font-bold text-indigo-600 font-mono uppercase tracking-wider flex items-center gap-1">
+                                        <Sparkles className="w-3.5 h-3.5 text-indigo-500 animate-pulse" />
+                                        Detailed Video Summary (Gemini AI)
+                                      </span>
+                                      <button
+                                        onClick={() => {
+                                          setLongSummaries(prev => {
+                                            const updated = { ...prev };
+                                            delete updated[video.id];
+                                            return updated;
+                                          });
+                                        }}
+                                        className="text-[10px] text-slate-400 hover:text-indigo-600 font-bold transition font-mono hover:underline cursor-pointer"
+                                      >
+                                        Collapse
+                                      </button>
+                                    </div>
+                                    <div className="mt-1">
+                                      {renderFormattedSummary(longSummaries[video.id])}
+                                    </div>
+                                  </div>
+                                ) : loadingLongSummaries[video.id] ? (
+                                  <div className="flex items-center gap-2 py-3 justify-center bg-indigo-50/20 border border-indigo-100/20 rounded-lg">
+                                    <div className="w-4 h-4 border-2 border-indigo-200 border-t-indigo-600 rounded-full animate-spin"></div>
+                                    <span className="text-xs font-mono font-bold text-indigo-600 animate-pulse">Gemini summarizing video content...</span>
+                                  </div>
+                                ) : (
+                                  <button
+                                    onClick={(e) => {
+                                      e.stopPropagation();
+                                      handleGenerateLongSummary(video);
+                                    }}
+                                    className="w-full inline-flex items-center justify-center gap-1.5 py-1.5 px-3 bg-gradient-to-r from-indigo-50 to-blue-50 hover:from-indigo-100 hover:to-blue-100 text-indigo-700 hover:text-indigo-800 font-bold text-xs rounded-lg border border-indigo-100 hover:border-indigo-200 transition shadow-sm cursor-pointer"
+                                  >
+                                    <Sparkles className="w-3.5 h-3.5 text-indigo-500 animate-pulse" />
+                                    <span>Expand for Gemini Summary</span>
+                                  </button>
+                                )}
+
+                                {longSummaryErrors[video.id] && (
+                                  <div className="text-[10px] text-red-600 font-semibold pt-1 text-center">
+                                    ⚠️ {longSummaryErrors[video.id]}
+                                  </div>
+                                )}
                               </div>
 
                               {/* ACCORDION/EXPANDABLE DETAILS PANEL */}
@@ -3616,6 +4192,36 @@ export default function App() {
         </div>
 
       </main>
+
+      {/* Main Dashboard Page Footer */}
+      <footer className="w-full bg-white border-t border-slate-200 py-6 mt-auto">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 flex flex-col md:flex-row items-center justify-between gap-4">
+          <div className="text-center md:text-left space-y-1">
+            <p className="text-xs font-semibold text-slate-700">
+              © {new Date().getFullYear()} Social Sentinel Hub — Grounded Video Intelligence Dashboard
+            </p>
+            <p className="text-[10px] text-slate-400 font-mono">
+              Dynamic classification powered by Google Search Grounding & Gemini LLM. All rights reserved.
+            </p>
+          </div>
+          
+          <div className="flex flex-wrap items-center justify-center gap-3">
+            {filteredVideos && filteredVideos.length > 0 && (
+              <span className="text-[10px] font-mono font-bold text-slate-500 bg-slate-100 px-2 py-1 rounded border border-slate-200">
+                {filteredVideos.length} Videos Filtered
+              </span>
+            )}
+            <button
+              onClick={handleDownloadCSVReport}
+              className="px-4 py-2 bg-indigo-600 hover:bg-indigo-700 text-white text-xs font-bold rounded-xl transition shadow-sm hover:shadow-md flex items-center gap-1.5 cursor-pointer"
+              title="Download full CSV dump of the currently filtered video data, including sentiment scores"
+            >
+              <Download className="w-4 h-4" />
+              Download Report (.CSV)
+            </button>
+          </div>
+        </div>
+      </footer>
 
       {/* CATEGORY DEEP DIVE & TREND ANALYSIS MODAL */}
       <AnimatePresence>
