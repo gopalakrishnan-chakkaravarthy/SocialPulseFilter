@@ -28,6 +28,7 @@ import {
   ExternalLink, 
   Lock, 
   Code,
+  Clock,
   Eye,
   Info,
   X,
@@ -67,6 +68,7 @@ interface VideoPost {
   mlConfidence: number;
   summary: string;
   region: string;
+  duration: string;
 }
 
 interface Analytics {
@@ -3791,12 +3793,12 @@ export default function App() {
                               exit={{ opacity: 0, scale: 0.95 }}
                               transition={{ duration: 0.25 }}
                               onClick={() => setSelectedPreviewVideo(video)}
-                              className={`bg-white rounded-xl border p-5 hover:bg-slate-50/50 hover:border-blue-400 hover:shadow-md transition duration-200 flex flex-col justify-between space-y-4 cursor-pointer group relative max-h-[420px] overflow-y-auto custom-scrollbar ${
+                              className={`bg-white rounded-xl border p-5 hover:bg-slate-50/50 hover:border-blue-400 hover:shadow-md transition duration-200 flex flex-col justify-between h-[465px] overflow-hidden cursor-pointer group relative ${
                                 isExpanded ? "border-blue-400 shadow-md ring-1 ring-blue-300/50" : "border-slate-200 shadow-sm"
                               }`}
                             >
-                              <div className="space-y-2">
-                                {/* Badges Header row */}
+                              {/* 1. Header Badges Row (Anchored Top) */}
+                              <div className="space-y-2 shrink-0 pb-2 border-b border-slate-100">
                                 <div className="flex items-center justify-between">
                                   <div className="flex items-center gap-1.5">
                                     <span className={`inline-flex items-center gap-1.5 px-2 py-0.5 rounded-md border text-[10px] font-bold uppercase tracking-wider ${platformStyles.badge}`}>
@@ -3806,221 +3808,232 @@ export default function App() {
                                     <span className={`inline-flex px-2 py-0.5 rounded-md border text-[10px] font-bold uppercase tracking-wider ${catStyles.badge}`}>
                                       {video.category}
                                     </span>
+                                    {video.duration && (
+                                      <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded-md border border-slate-200 bg-slate-50 text-slate-600 text-[10px] font-mono font-bold tracking-wider" title="Video duration">
+                                        <Clock className="w-3 h-3 text-slate-400" />
+                                        {video.duration}
+                                      </span>
+                                    )}
                                   </div>
                                   <span className="text-[11px] font-mono text-slate-400 font-semibold">{video.uploadedAt}</span>
                                 </div>
-
-                                {/* Title */}
-                                <h4 className="text-sm font-bold leading-relaxed text-slate-800 font-display group-hover:text-blue-600 transition">
-                                  {video.title}
-                                </h4>
-
-                                {/* Interactive Call To Action indicator */}
-                                <div className="flex items-center gap-1.5 text-[11px] text-blue-600 font-bold opacity-85 group-hover:opacity-100 transition duration-150">
-                                  <Play className="w-3.5 h-3.5 fill-blue-600/20 text-blue-600" />
-                                  <span>Watch Video Preview &rarr;</span>
-                                </div>
-
-                                {/* Uploader & Stats */}
-                                <div className="flex items-center justify-between text-xs text-slate-500 font-mono font-medium pt-1">
-                                  <span className="font-semibold text-slate-600">@{video.uploader}</span>
-                                  <div className="flex items-center gap-3">
-                                    <span className="flex items-center gap-1">
-                                      <Eye className="w-3.5 h-3.5 text-slate-400" />
-                                      <span>{formatViews(video.views)}</span>
-                                      {(() => {
-                                        const { isUp, formatted } = getEngagementChange(video.id);
-                                        return (
-                                          <span className={`inline-flex items-center gap-0.5 px-1 py-0.5 rounded text-[9px] font-bold border transition-all ${
-                                            isUp 
-                                              ? "text-emerald-600 bg-emerald-50 border-emerald-100/80" 
-                                              : "text-rose-600 bg-rose-50 border-rose-100/80"
-                                          }`} title="Engagement shift over last 24 hours">
-                                            {isUp ? <TrendingUp className="w-2.5 h-2.5" /> : <TrendingDown className="w-2.5 h-2.5" />}
-                                            {formatted}
-                                          </span>
-                                        );
-                                      })()}
-                                    </span>
-                                    <span className="flex items-center gap-1">
-                                      <ThumbsUp className="w-3.5 h-3.5" />
-                                      {formatViews(video.likes)}
-                                    </span>
-                                  </div>
-                                </div>
                               </div>
 
-                              {/* SENTIMENT VISUALIZER METER */}
-                              <div className="bg-slate-50 p-3 rounded-lg border border-slate-200 space-y-2" onClick={(e) => e.stopPropagation()}>
-                                <div className="flex items-center justify-between text-xs font-mono">
-                                  <span className="text-slate-600 font-semibold">Sentiment Rating:</span>
-                                  {(() => {
-                                    let clr = "text-amber-600";
-                                    if (video.sentimentLabel === "Positive") clr = "text-emerald-600";
-                                    if (video.sentimentLabel === "Negative") clr = "text-red-600";
-                                    return (
-                                      <span className={`font-bold ${clr} flex items-center gap-1`}>
-                                        {video.sentimentLabel}
-                                        <span className="text-slate-400">({video.sentimentScore > 0 ? `+${video.sentimentScore}` : video.sentimentScore})</span>
-                                      </span>
-                                    );
-                                  })()}
-                                </div>
+                              {/* 2. Scrollable Center Area (Scrolls dynamically with custom scrollbar) */}
+                              <div className="flex-grow overflow-y-auto custom-scrollbar pr-1.5 space-y-4 my-2.5">
+                                <div className="space-y-2">
+                                  {/* Title */}
+                                  <h4 className="text-sm font-bold leading-relaxed text-slate-800 font-display group-hover:text-blue-600 transition">
+                                    {video.title}
+                                  </h4>
 
-                                {/* Score Slider Track indicator */}
-                                <div className="h-1.5 bg-slate-200/80 rounded-full overflow-hidden relative">
-                                  {/* Center line */}
-                                  <div className="absolute left-1/2 top-0 bottom-0 w-0.5 bg-slate-300 z-10"></div>
-                                  {/* Progress bar fill */}
-                                  {video.sentimentScore >= 0 ? (
-                                    <div 
-                                      className="h-full bg-emerald-500 absolute left-1/2 transition-all duration-1000"
-                                      style={{ width: `${(video.sentimentScore) * 50}%` }}
-                                    ></div>
-                                  ) : (
-                                    <div 
-                                      className="h-full bg-rose-500 absolute transition-all duration-1000"
-                                      style={{ 
-                                        left: `${50 - Math.abs(video.sentimentScore) * 50}%`,
-                                        width: `${Math.abs(video.sentimentScore) * 50}%` 
-                                      }}
-                                    ></div>
-                                  )}
-                                </div>
+                                  {/* Interactive Call To Action indicator */}
+                                  <div className="flex items-center gap-1.5 text-[11px] text-blue-600 font-bold opacity-85 group-hover:opacity-100 transition duration-150">
+                                    <Play className="w-3.5 h-3.5 fill-blue-600/20 text-blue-600" />
+                                    <span>Watch Video Preview &rarr;</span>
+                                  </div>
 
-                                {/* Explain Sentiment Button & Result */}
-                                <div className="pt-2 border-t border-slate-200/60 mt-2">
-                                  {explanations[video.id] ? (
-                                    <div className="space-y-1.5">
-                                      <span className="text-[10px] font-bold text-slate-400 font-mono uppercase tracking-wider flex items-center gap-1">
-                                        <Sparkles className="w-3 h-3 text-amber-500" />
-                                        Sentiment Drivers (Gemini AI)
+                                  {/* Uploader & Stats */}
+                                  <div className="flex items-center justify-between text-xs text-slate-500 font-mono font-medium pt-1">
+                                    <span className="font-semibold text-slate-600">@{video.uploader}</span>
+                                    <div className="flex items-center gap-3">
+                                      <span className="flex items-center gap-1">
+                                        <Eye className="w-3.5 h-3.5 text-slate-400" />
+                                        <span>{formatViews(video.views)}</span>
+                                        {(() => {
+                                          const { isUp, formatted } = getEngagementChange(video.id);
+                                          return (
+                                            <span className={`inline-flex items-center gap-0.5 px-1 py-0.5 rounded text-[9px] font-bold border transition-all ${
+                                              isUp 
+                                                ? "text-emerald-600 bg-emerald-50 border-emerald-100/80" 
+                                                : "text-rose-600 bg-rose-50 border-rose-100/80"
+                                            }`} title="Engagement shift over last 24 hours">
+                                              {isUp ? <TrendingUp className="w-2.5 h-2.5" /> : <TrendingDown className="w-2.5 h-2.5" />}
+                                              {formatted}
+                                            </span>
+                                          );
+                                        })()}
                                       </span>
-                                      <ul className="space-y-1 text-[11px] text-slate-600 font-medium">
-                                        {explanations[video.id].map((reason, rIdx) => (
-                                          <motion.li 
-                                            key={rIdx}
-                                            initial={{ opacity: 0, x: -5 }}
-                                            animate={{ opacity: 1, x: 0 }}
-                                            transition={{ delay: rIdx * 0.1 }}
-                                            className="flex items-start gap-1.5 leading-relaxed"
-                                          >
-                                            <span className="text-amber-500 select-none font-bold mt-0.5">•</span>
-                                            <span>{reason}</span>
-                                          </motion.li>
-                                        ))}
-                                      </ul>
+                                      <span className="flex items-center gap-1">
+                                        <ThumbsUp className="w-3.5 h-3.5" />
+                                        {formatViews(video.likes)}
+                                      </span>
                                     </div>
-                                  ) : loadingExplanations[video.id] ? (
-                                    <div className="flex items-center gap-2 py-1.5 justify-center">
-                                      <div className="w-3.5 h-3.5 border-2 border-blue-200 border-t-blue-600 rounded-full animate-spin"></div>
-                                      <span className="text-[11px] font-mono font-bold text-slate-500 animate-pulse">Consulting Gemini Expert...</span>
+                                  </div>
+                                </div>
+
+                                {/* SENTIMENT VISUALIZER METER */}
+                                <div className="bg-slate-50 p-3 rounded-lg border border-slate-200 space-y-2" onClick={(e) => e.stopPropagation()}>
+                                  <div className="flex items-center justify-between text-xs font-mono">
+                                    <span className="text-slate-600 font-semibold">Sentiment Rating:</span>
+                                    {(() => {
+                                      let clr = "text-amber-600";
+                                      if (video.sentimentLabel === "Positive") clr = "text-emerald-600";
+                                      if (video.sentimentLabel === "Negative") clr = "text-red-600";
+                                      return (
+                                        <span className={`font-bold ${clr} flex items-center gap-1`}>
+                                          {video.sentimentLabel}
+                                          <span className="text-slate-400">({video.sentimentScore > 0 ? `+${video.sentimentScore}` : video.sentimentScore})</span>
+                                        </span>
+                                      );
+                                    })()}
+                                  </div>
+
+                                  {/* Score Slider Track indicator */}
+                                  <div className="h-1.5 bg-slate-200/80 rounded-full overflow-hidden relative">
+                                    {/* Center line */}
+                                    <div className="absolute left-1/2 top-0 bottom-0 w-0.5 bg-slate-300 z-10"></div>
+                                    {/* Progress bar fill */}
+                                    {video.sentimentScore >= 0 ? (
+                                      <div 
+                                        className="h-full bg-emerald-500 absolute left-1/2 transition-all duration-1000"
+                                        style={{ width: `${(video.sentimentScore) * 50}%` }}
+                                      ></div>
+                                    ) : (
+                                      <div 
+                                        className="h-full bg-rose-500 absolute transition-all duration-1000"
+                                        style={{ 
+                                          left: `${50 - Math.abs(video.sentimentScore) * 50}%`,
+                                          width: `${Math.abs(video.sentimentScore) * 50}%` 
+                                        }}
+                                      ></div>
+                                    )}
+                                  </div>
+
+                                  {/* Explain Sentiment Button & Result */}
+                                  <div className="pt-2 border-t border-slate-200/60 mt-2">
+                                    {explanations[video.id] ? (
+                                      <div className="space-y-1.5">
+                                        <span className="text-[10px] font-bold text-slate-400 font-mono uppercase tracking-wider flex items-center gap-1">
+                                          <Sparkles className="w-3 h-3 text-amber-500" />
+                                          Sentiment Drivers (Gemini AI)
+                                        </span>
+                                        <ul className="space-y-1 text-[11px] text-slate-600 font-medium">
+                                          {explanations[video.id].map((reason, rIdx) => (
+                                            <motion.li 
+                                              key={rIdx}
+                                              initial={{ opacity: 0, x: -5 }}
+                                              animate={{ opacity: 1, x: 0 }}
+                                              transition={{ delay: rIdx * 0.1 }}
+                                              className="flex items-start gap-1.5 leading-relaxed"
+                                            >
+                                              <span className="text-amber-500 select-none font-bold mt-0.5">•</span>
+                                              <span>{reason}</span>
+                                            </motion.li>
+                                          ))}
+                                        </ul>
+                                      </div>
+                                    ) : loadingExplanations[video.id] ? (
+                                      <div className="flex items-center gap-2 py-1.5 justify-center">
+                                        <div className="w-3.5 h-3.5 border-2 border-blue-200 border-t-blue-600 rounded-full animate-spin"></div>
+                                        <span className="text-[11px] font-mono font-bold text-slate-500 animate-pulse">Consulting Gemini Expert...</span>
+                                      </div>
+                                    ) : (
+                                      <button
+                                        onClick={(e) => {
+                                          e.stopPropagation();
+                                          handleExplainSentiment(video);
+                                        }}
+                                        className="w-full inline-flex items-center justify-center gap-1.5 py-1 px-2.5 bg-indigo-50 hover:bg-indigo-100 text-indigo-700 hover:text-indigo-800 font-bold text-[11px] rounded-md border border-indigo-150 hover:border-indigo-200 transition"
+                                      >
+                                        <Sparkles className="w-3.5 h-3.5 text-indigo-500 animate-pulse" />
+                                        <span>Explain Sentiment</span>
+                                      </button>
+                                    )}
+
+                                    {explanationErrors[video.id] && (
+                                      <div className="text-[10px] text-red-600 font-semibold pt-1 text-center">
+                                        ⚠️ {explanationErrors[video.id]}
+                                      </div>
+                                    )}
+                                  </div>
+                                </div>
+
+                                {/* GEMINI DETAILED SUMMARY EXPANDABLE PANEL */}
+                                <div className="pt-2 border-t border-slate-200/60" onClick={(e) => e.stopPropagation()}>
+                                  {longSummaries[video.id] ? (
+                                    <div className="space-y-2 bg-indigo-50/40 p-3.5 rounded-lg border border-indigo-100/50 relative">
+                                      <div className="flex items-center justify-between">
+                                        <span className="text-[10px] font-bold text-indigo-600 font-mono uppercase tracking-wider flex items-center gap-1">
+                                          <Sparkles className="w-3.5 h-3.5 text-indigo-500 animate-pulse" />
+                                          Detailed Video Summary (Gemini AI)
+                                        </span>
+                                        <button
+                                          onClick={() => {
+                                            setLongSummaries(prev => {
+                                              const updated = { ...prev };
+                                              delete updated[video.id];
+                                              return updated;
+                                            });
+                                          }}
+                                          className="text-[10px] text-slate-400 hover:text-indigo-600 font-bold transition font-mono hover:underline cursor-pointer"
+                                        >
+                                          Collapse
+                                        </button>
+                                      </div>
+                                      <div className="mt-1">
+                                        {renderFormattedSummary(longSummaries[video.id])}
+                                      </div>
+                                    </div>
+                                  ) : loadingLongSummaries[video.id] ? (
+                                    <div className="flex items-center gap-2 py-3 justify-center bg-indigo-50/20 border border-indigo-100/20 rounded-lg">
+                                      <div className="w-4 h-4 border-2 border-indigo-200 border-t-indigo-600 rounded-full animate-spin"></div>
+                                      <span className="text-xs font-mono font-bold text-indigo-600 animate-pulse">Gemini summarizing video content...</span>
                                     </div>
                                   ) : (
                                     <button
                                       onClick={(e) => {
                                         e.stopPropagation();
-                                        handleExplainSentiment(video);
+                                        handleGenerateLongSummary(video);
                                       }}
-                                      className="w-full inline-flex items-center justify-center gap-1.5 py-1 px-2.5 bg-indigo-50 hover:bg-indigo-100 text-indigo-700 hover:text-indigo-800 font-bold text-[11px] rounded-md border border-indigo-150 hover:border-indigo-200 transition"
+                                      className="w-full inline-flex items-center justify-center gap-1.5 py-1.5 px-3 bg-gradient-to-r from-indigo-50 to-blue-50 hover:from-indigo-100 hover:to-blue-100 text-indigo-700 hover:text-indigo-800 font-bold text-xs rounded-lg border border-indigo-100 hover:border-indigo-200 transition shadow-sm cursor-pointer"
                                     >
                                       <Sparkles className="w-3.5 h-3.5 text-indigo-500 animate-pulse" />
-                                      <span>Explain Sentiment</span>
+                                      <span>Expand for Gemini Summary</span>
                                     </button>
                                   )}
 
-                                  {explanationErrors[video.id] && (
+                                  {longSummaryErrors[video.id] && (
                                     <div className="text-[10px] text-red-600 font-semibold pt-1 text-center">
-                                      ⚠️ {explanationErrors[video.id]}
+                                      ⚠️ {longSummaryErrors[video.id]}
                                     </div>
+                                  )}
+                                </div>
+
+                                {/* ACCORDION/EXPANDABLE DETAILS PANEL */}
+                                <div className="space-y-2">
+                                  <button
+                                    onClick={(e) => {
+                                      e.stopPropagation();
+                                      setExpandedCard(isExpanded ? null : video.id);
+                                    }}
+                                    className="w-full text-left text-xs font-semibold text-slate-500 hover:text-slate-800 flex items-center justify-between transition focus:outline-none"
+                                  >
+                                    <span>ML Classification Context</span>
+                                    {isExpanded ? <ChevronUp className="w-4 h-4" /> : <ChevronDown className="w-4 h-4" />}
+                                  </button>
+
+                                  {isExpanded && (
+                                    <motion.div
+                                      initial={{ height: 0, opacity: 0 }}
+                                      animate={{ height: "auto", opacity: 1 }}
+                                      className="pt-2 text-xs leading-relaxed text-slate-600 border-t border-slate-200 space-y-2"
+                                      onClick={(e) => e.stopPropagation()}
+                                    >
+                                      <p className="bg-slate-50 p-2 rounded-md italic">
+                                        "{video.summary}"
+                                      </p>
+                                      <div className="flex items-center justify-between text-[10px] font-mono text-slate-400 pt-1 font-semibold">
+                                        <span>Classification Confidence: {(video.mlConfidence * 100).toFixed(0)}%</span>
+                                        <span>Model: gemini-3.5-flash</span>
+                                      </div>
+                                    </motion.div>
                                   )}
                                 </div>
                               </div>
 
-                              {/* GEMINI DETAILED SUMMARY EXPANDABLE PANEL */}
-                              <div className="pt-2 border-t border-slate-200/60" onClick={(e) => e.stopPropagation()}>
-                                {longSummaries[video.id] ? (
-                                  <div className="space-y-2 bg-indigo-50/40 p-3.5 rounded-lg border border-indigo-100/50 relative">
-                                    <div className="flex items-center justify-between">
-                                      <span className="text-[10px] font-bold text-indigo-600 font-mono uppercase tracking-wider flex items-center gap-1">
-                                        <Sparkles className="w-3.5 h-3.5 text-indigo-500 animate-pulse" />
-                                        Detailed Video Summary (Gemini AI)
-                                      </span>
-                                      <button
-                                        onClick={() => {
-                                          setLongSummaries(prev => {
-                                            const updated = { ...prev };
-                                            delete updated[video.id];
-                                            return updated;
-                                          });
-                                        }}
-                                        className="text-[10px] text-slate-400 hover:text-indigo-600 font-bold transition font-mono hover:underline cursor-pointer"
-                                      >
-                                        Collapse
-                                      </button>
-                                    </div>
-                                    <div className="mt-1">
-                                      {renderFormattedSummary(longSummaries[video.id])}
-                                    </div>
-                                  </div>
-                                ) : loadingLongSummaries[video.id] ? (
-                                  <div className="flex items-center gap-2 py-3 justify-center bg-indigo-50/20 border border-indigo-100/20 rounded-lg">
-                                    <div className="w-4 h-4 border-2 border-indigo-200 border-t-indigo-600 rounded-full animate-spin"></div>
-                                    <span className="text-xs font-mono font-bold text-indigo-600 animate-pulse">Gemini summarizing video content...</span>
-                                  </div>
-                                ) : (
-                                  <button
-                                    onClick={(e) => {
-                                      e.stopPropagation();
-                                      handleGenerateLongSummary(video);
-                                    }}
-                                    className="w-full inline-flex items-center justify-center gap-1.5 py-1.5 px-3 bg-gradient-to-r from-indigo-50 to-blue-50 hover:from-indigo-100 hover:to-blue-100 text-indigo-700 hover:text-indigo-800 font-bold text-xs rounded-lg border border-indigo-100 hover:border-indigo-200 transition shadow-sm cursor-pointer"
-                                  >
-                                    <Sparkles className="w-3.5 h-3.5 text-indigo-500 animate-pulse" />
-                                    <span>Expand for Gemini Summary</span>
-                                  </button>
-                                )}
-
-                                {longSummaryErrors[video.id] && (
-                                  <div className="text-[10px] text-red-600 font-semibold pt-1 text-center">
-                                    ⚠️ {longSummaryErrors[video.id]}
-                                  </div>
-                                )}
-                              </div>
-
-                              {/* ACCORDION/EXPANDABLE DETAILS PANEL */}
-                              <div className="space-y-2">
-                                <button
-                                  onClick={(e) => {
-                                    e.stopPropagation();
-                                    setExpandedCard(isExpanded ? null : video.id);
-                                  }}
-                                  className="w-full text-left text-xs font-semibold text-slate-500 hover:text-slate-800 flex items-center justify-between transition focus:outline-none"
-                                >
-                                  <span>ML Classification Context</span>
-                                  {isExpanded ? <ChevronUp className="w-4 h-4" /> : <ChevronDown className="w-4 h-4" />}
-                                </button>
-
-                                {isExpanded && (
-                                  <motion.div
-                                    initial={{ height: 0, opacity: 0 }}
-                                    animate={{ height: "auto", opacity: 1 }}
-                                    className="pt-2 text-xs leading-relaxed text-slate-600 border-t border-slate-200 space-y-2"
-                                    onClick={(e) => e.stopPropagation()}
-                                  >
-                                    <p className="bg-slate-50 p-2 rounded-md italic">
-                                      "{video.summary}"
-                                    </p>
-                                    <div className="flex items-center justify-between text-[10px] font-mono text-slate-400 pt-1 font-semibold">
-                                      <span>Classification Confidence: {(video.mlConfidence * 100).toFixed(0)}%</span>
-                                      <span>Model: gemini-3.5-flash</span>
-                                    </div>
-                                  </motion.div>
-                                )}
-                              </div>
-
-                              {/* WATCH VIDEO REDIRECT ACTION button & SHARE button */}
-                              <div className="pt-2 border-t border-slate-100 flex items-center justify-between gap-2" onClick={(e) => e.stopPropagation()}>
+                              {/* 3. Action Buttons (Anchored Bottom) */}
+                              <div className="pt-2 border-t border-slate-100 flex items-center justify-between gap-2 shrink-0" onClick={(e) => e.stopPropagation()}>
                                 <a
                                   href={video.url}
                                   target="_blank"
@@ -4468,6 +4481,12 @@ export default function App() {
                           <span className="text-[10px] font-mono text-slate-400 font-semibold bg-slate-800 px-2 py-0.5 rounded border border-slate-700">
                             Confidence: {Math.round(selectedPreviewVideo.mlConfidence * 100)}%
                           </span>
+                          {selectedPreviewVideo.duration && (
+                            <span className="text-[10px] font-mono text-slate-400 font-semibold bg-slate-800 px-2 py-0.5 rounded border border-slate-700 inline-flex items-center gap-1">
+                              <Clock className="w-3 h-3 text-slate-500" />
+                              Duration: {selectedPreviewVideo.duration}
+                            </span>
+                          )}
                         </>
                       );
                     })()}

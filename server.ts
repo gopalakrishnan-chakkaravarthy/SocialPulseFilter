@@ -49,6 +49,7 @@ const fallbackData = (days: number, region: string, categories: string[]) => {
     mlConfidence: number;
     summary: string;
     region: string;
+    duration: string;
   }> = [];
 
   // Dynamically generate entries based strictly on category parameters to avoid hardcoded channels, page names, or platform URLs
@@ -83,7 +84,8 @@ const fallbackData = (days: number, region: string, categories: string[]) => {
         sentimentLabel: "Positive",
         mlConfidence: 0.92,
         summary: summary1,
-        region: isTN ? "Tamil Nadu" : "Global"
+        region: isTN ? "Tamil Nadu" : "Global",
+        duration: "12:15"
       });
 
       allVideos.push({
@@ -100,7 +102,8 @@ const fallbackData = (days: number, region: string, categories: string[]) => {
         sentimentLabel: "Negative",
         mlConfidence: 0.89,
         summary: summary2,
-        region: isTN ? "Tamil Nadu" : "Global"
+        region: isTN ? "Tamil Nadu" : "Global",
+        duration: "01:05"
       });
       return;
     }
@@ -134,6 +137,7 @@ const fallbackData = (days: number, region: string, categories: string[]) => {
       score1 = 0.9;
     }
 
+    const duration1 = c === "sports" ? "03:45" : c === "political" ? "15:30" : "24:15";
     allVideos.push({
       id: `${isTN ? "tn" : "glb"}-${c}-1`,
       title: title1,
@@ -148,7 +152,8 @@ const fallbackData = (days: number, region: string, categories: string[]) => {
       sentimentLabel: label1,
       mlConfidence: 0.95,
       summary: summary1,
-      region: isTN ? "Tamil Nadu" : "Global"
+      region: isTN ? "Tamil Nadu" : "Global",
+      duration: duration1
     });
 
     // Video 2 (Negative / Neutral)
@@ -178,6 +183,7 @@ const fallbackData = (days: number, region: string, categories: string[]) => {
       score2 = -0.7;
     }
 
+    const duration2 = c === "sports" ? "00:58" : c === "political" ? "05:12" : "01:30";
     allVideos.push({
       id: `${isTN ? "tn" : "glb"}-${c}-2`,
       title: title2,
@@ -192,7 +198,8 @@ const fallbackData = (days: number, region: string, categories: string[]) => {
       sentimentLabel: label2,
       mlConfidence: 0.94,
       summary: summary2,
-      region: isTN ? "Tamil Nadu" : "Global"
+      region: isTN ? "Tamil Nadu" : "Global",
+      duration: duration2
     });
   });
 
@@ -322,7 +329,8 @@ You MUST respond with a single valid JSON object that fits this exact schema str
       "sentimentLabel": "Positive" | "Neutral" | "Negative",
       "mlConfidence": number (between 0.0 and 1.0),
       "summary": "string (brief ML narrative of why it's categorized here, sentiment grade justification)",
-      "region": "string (Tamil Nadu or Global)"
+      "region": "string (Tamil Nadu or Global)",
+      "duration": "string (video duration, formatted as MM:SS or HH:MM:SS, e.g. '04:15', '12:30', or '00:58' for short reels/shorts)"
     }
   ],
   "analytics": {
@@ -370,10 +378,13 @@ Do NOT wrap the response in markdown blocks like \`\`\`json. Output raw JSON onl
     // Double check that the categories match the filtered inputs
     if (data && data.videos) {
       data.videos = data.videos.filter((v: any) => categories.includes(v.category?.toLowerCase()));
-      // Ensure all videos have region set
+      // Ensure all videos have region and duration set
       data.videos.forEach((v: any) => {
         if (!v.region) {
           v.region = isTN ? "Tamil Nadu" : "Global";
+        }
+        if (!v.duration) {
+          v.duration = "03:15";
         }
       });
       // Recalculate aggregates to match actual results precisely
