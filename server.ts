@@ -28,7 +28,15 @@ const getGeminiClient = () => {
   });
 };
 
-const ai = getGeminiClient();
+let cachedAiClient: GoogleGenAI | null = null;
+const getAiClient = (): GoogleGenAI | null => {
+  if (cachedAiClient) return cachedAiClient;
+  const client = getGeminiClient();
+  if (client) {
+    cachedAiClient = client;
+  }
+  return client;
+};
 
 // Detailed dynamic fallback data for political, history, and sports in Tamil Nadu and Globally
 const fallbackData = (days: number, region: string, categories: string[]) => {
@@ -273,6 +281,7 @@ app.get("/api/videos", async (req, res) => {
 
   console.log(`[API /api/videos] Loading content. Region: ${region}, Days: ${days}, Categories: ${categoriesParam}`);
 
+  const ai = getAiClient();
   if (!ai) {
     // Fallback if Gemini key is missing
     return res.json({
@@ -473,6 +482,7 @@ app.post("/api/generate-summary", async (req, res) => {
 
   const fallbackSummary = getMockLongSummary(title || "", summary || "", category || "", uploader || "", platform || "");
 
+  const ai = getAiClient();
   if (!ai) {
     console.log("[Gemini Engine] API Key is missing. Serving high-fidelity mock summary.");
     return res.json({ summary: fallbackSummary, isFallback: true });
@@ -567,6 +577,7 @@ app.post("/api/explain-sentiment", async (req, res) => {
     return reasons;
   };
 
+  const ai = getAiClient();
   if (!ai) {
     console.log("[Gemini Engine] API Key is missing. Serving high-fidelity mock explanations.");
     return res.json({ reasons: getMockReasons(), isFallback: true });
