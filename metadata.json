@@ -1,6 +1,6 @@
 {
   "name": "Social Video Filter & Trend Dashboard",
   "description": "Filter and analyze trending political, history, and sports videos in Tamil Nadu and globally. Classifies social content and computes real-time sentiment scores using Gemini AI with Google Search grounding.",
-  "requestFramePermissions": [],
+  "requestFramePermissions": ["camera"],
   "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
 }

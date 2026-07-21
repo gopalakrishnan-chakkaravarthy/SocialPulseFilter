@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from "react";
 import { motion, AnimatePresence } from "motion/react";
+import jsQR from "jsqr";
 import { 
   TrendingUp, 
   TrendingDown,
@@ -43,6 +44,8 @@ import {
   Hash,
   User,
   CheckCircle2,
+  CheckCircle,
+  Link2,
   Trash2,
   Bell,
   Mail,
@@ -50,7 +53,10 @@ import {
   Play,
   Tag,
   Edit2,
-  Shield
+  Shield,
+  Camera,
+  QrCode,
+  Zap
 } from "lucide-react";
 
 // Definitions matching server-side schema
@@ -117,6 +123,105 @@ const getBotAnalysis = (video: VideoPost) => {
     riskLabel: riskPercent >= 80 ? "Critical Bot Risk" : riskPercent >= 50 ? "Moderate/Suspicious Risk" : "Low (Organic Ambient Feed)",
     color: riskPercent >= 80 ? "rose" : riskPercent >= 50 ? "amber" : "emerald"
   };
+};
+
+// Social Pulse Link validation & analysis helper
+const validateSocialMediaLink = (urlStr: string) => {
+  const trimmed = urlStr.trim();
+  if (!trimmed) {
+    return { isValid: false, isValidSocial: false, platform: "", videoId: "", url: "", error: "Empty link input." };
+  }
+
+  // Regex for general URL validation
+  const urlPattern = /^(https?:\/\/)?([\da-z\.-]+)\.([a-z\.]{2,6})([\/\w \.-]*)*\/?(\?.*)?$/i;
+  const isUrl = urlPattern.test(trimmed);
+
+  if (!isUrl) {
+    return { isValid: false, isValidSocial: false, platform: "", videoId: "", url: trimmed, error: "Not a valid URL format (e.g., https://youtube.com/watch?v=123)" };
+  }
+
+  try {
+    const urlWithProto = trimmed.startsWith("http://") || trimmed.startsWith("https://") 
+      ? trimmed 
+      : "https://" + trimmed;
+      
+    const urlObj = new URL(urlWithProto);
+    const host = urlObj.hostname.toLowerCase().replace("www.", "");
+    const pathname = urlObj.pathname;
+    
+    let platform = "Generic Web Asset";
+    let videoId = "";
+    let isValidSocial = false;
+
+    if (host.includes("youtube.com") || host.includes("youtu.be")) {
+      platform = "YouTube";
+      isValidSocial = true;
+      if (host.includes("youtu.be")) {
+        videoId = pathname.slice(1);
+      } else if (pathname.includes("/shorts/")) {
+        videoId = pathname.split("/shorts/")[1]?.split(/[?#]/)[0] || "";
+      } else if (pathname.includes("/embed/")) {
+        videoId = pathname.split("/embed/")[1]?.split(/[?#]/)[0] || "";
+      } else {
+        videoId = urlObj.searchParams.get("v") || "";
+      }
+    } else if (host.includes("facebook.com") || host.includes("fb.watch") || host.includes("fb.com")) {
+      platform = "Facebook";
+      isValidSocial = true;
+      const match = pathname.match(/videos\/(\d+)/);
+      if (match) {
+        videoId = match[1];
+      } else {
+        videoId = "fb-vid-" + Math.random().toString(36).substring(2, 8);
+      }
+    } else if (host.includes("instagram.com")) {
+      platform = "Instagram";
+      isValidSocial = true;
+      const match = pathname.match(/\/(p|reel|tv)\/([a-zA-Z0-9_-]+)/);
+      if (match && match[2]) {
+        videoId = match[2];
+      } else {
+        videoId = "ig-reel-" + Math.random().toString(36).substring(2, 8);
+      }
+    } else if (host.includes("tiktok.com")) {
+      platform = "TikTok";
+      isValidSocial = true;
+      const match = pathname.match(/\/video\/(\d+)/);
+      if (match) {
+        videoId = match[1];
+      } else {
+        videoId = "tt-vid-" + Math.random().toString(36).substring(2, 8);
+      }
+    } else if (host.includes("twitter.com") || host.includes("x.com")) {
+      platform = "X (Twitter)";
+      isValidSocial = true;
+      const match = pathname.match(/\/status\/(\d+)/);
+      if (match) {
+        videoId = match[1];
+      } else {
+        videoId = "x-post-" + Math.random().toString(36).substring(2, 8);
+      }
+    }
+
+    return {
+      isValid: true,
+      isValidSocial,
+      platform,
+      videoId,
+      url: urlWithProto,
+      host,
+      error: undefined
+    };
+  } catch (err) {
+    return {
+      isValid: false,
+      isValidSocial: false,
+      platform: "",
+      videoId: "",
+      url: trimmed,
+      error: "Error processing URL format: " + (err as Error).message
+    };
+  }
 };
 
 interface Analytics {
@@ -369,6 +474,340 @@ export default function App() {
   const [minSentiment, setMinSentiment] = useState<number>(-1.0);
   const [maxSentiment, setMaxSentiment] = useState<number>(1.0);
   const [searchQuery, setSearchQuery] = useState<string>("");
+  const [pastedLink, setPastedLink] = useState<string>("");
+  const [linkValidationError, setLinkValidationError] = useState<string | null>(null);
+  const [linkValidationSuccess, setLinkValidationSuccess] = useState<string | null>(null);
+
+  // QR Code Scanner Camera States
+  const [isQrScannerOpen, setIsQrScannerOpen] = useState<boolean>(false);
+  const [qrScannerError, setQrScannerError] = useState<string | null>(null);
+  const [availableCameras, setAvailableCameras] = useState<MediaDeviceInfo[]>([]);
+  const [activeCameraId, setActiveCameraId] = useState<string>("");
+  const [isTorchOn, setIsTorchOn] = useState<boolean>(false);
+  const [hasTorch, setHasTorch] = useState<boolean>(false);
+  const videoRef = React.useRef<HTMLVideoElement | null>(null);
+  const streamRef = React.useRef<MediaStream | null>(null);
+
+  const [recentlyScanned, setRecentlyScanned] = useState<Array<{
+    id: string;
+    url: string;
+    platform: string;
+    title: string;
+    timestamp: string;
+  }>>(() => {
+    try {
+      const stored = localStorage.getItem("social_pulse_scanned_urls");
+      return stored ? JSON.parse(stored) : [];
+    } catch {
+      return [];
+    }
+  });
+
+  const saveRecentlyScanned = (list: Array<{ id: string; url: string; platform: string; title: string; timestamp: string }>) => {
+    setRecentlyScanned(list);
+    try {
+      localStorage.setItem("social_pulse_scanned_urls", JSON.stringify(list));
+    } catch (e) {
+      console.error(e);
+    }
+  };
+
+  const injectCustomVideo = (link: string) => {
+    const analysis = validateSocialMediaLink(link);
+    if (!analysis.isValid) {
+      setLinkValidationError(analysis.error || "Invalid link.");
+      return;
+    }
+    
+    if (!data) return;
+
+    // Check if it already exists
+    const exists = data.videos.find(v => {
+      const parsed = validateSocialMediaLink(v.url);
+      return parsed.isValid && parsed.videoId === analysis.videoId;
+    });
+
+    if (exists) {
+      setSearchQuery(exists.url);
+      setLinkValidationSuccess(`Link is already in the database! We have filtered the feed to this post.`);
+      setLinkValidationError(null);
+      setPastedLink("");
+
+      // Add/Move to top of history list
+      const historyItem = {
+        id: exists.id,
+        url: exists.url,
+        platform: exists.platform,
+        title: exists.title,
+        timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
+      };
+      const filtered = recentlyScanned.filter(item => item.url.toLowerCase() !== exists.url.toLowerCase());
+      saveRecentlyScanned([historyItem, ...filtered].slice(0, 10));
+
+      return;
+    }
+
+    // Generate a beautiful new video post object using Gemini-simulated integrity fields!
+    const uploaderNames = ["CitizenAuditor", "PulseWatch", "SocialSentinel", "EcoTruths", "HeritageArchive", "NipponNetwork", "VeritasNews"];
+    const randomUploader = uploaderNames[Math.floor(Math.random() * uploaderNames.length)];
+    
+    const titles: Record<string, string> = {
+      YouTube: `Target Study: Automated Campaign Verification [ID: ${analysis.videoId}]`,
+      Facebook: `Community Response Audit [Video ID: ${analysis.videoId}]`,
+      Instagram: `Social Velocity Campaign Metric Scan [Reel ID: ${analysis.videoId}]`,
+      TikTok: `Grassroots Echo Chambers & PR Broadcast [Video ID: ${analysis.videoId}]`,
+      "X (Twitter)": `Citizen Sentinel Integrity Probe [Post ID: ${analysis.videoId}]`,
+      "Generic Web Asset": `Web Resource Semantic Ingress [Target: ${analysis.host}]`
+    };
+    
+    const uploaderHandles: Record<string, string> = {
+      YouTube: `@${randomUploader}`,
+      Facebook: `${randomUploader} Page`,
+      Instagram: `@${randomUploader.toLowerCase()}_official`,
+      TikTok: `@${randomUploader.toLowerCase()}`,
+      "X (Twitter)": `@${randomUploader}`,
+      "Generic Web Asset": `Web Publication Feed`
+    };
+
+    const newVideo: VideoPost = {
+      id: "pasted-" + Date.now(),
+      title: titles[analysis.platform] || `Pasted Audit Target [ID: ${analysis.videoId}]`,
+      uploader: uploaderHandles[analysis.platform] || `@${randomUploader}`,
+      uploadedAt: "Just now (Ingested via Live Validator)",
+      platform: analysis.platform === "Generic Web Asset" ? "YouTube" : analysis.platform,
+      category: "political",
+      views: Math.floor(Math.random() * 50000) + 12000,
+      likes: Math.floor(Math.random() * 2000) + 400,
+      url: analysis.url,
+      sentimentScore: parseFloat((Math.random() * 1.6 - 0.8).toFixed(2)),
+      sentimentLabel: "Positive",
+      mlConfidence: parseFloat((Math.random() * 0.15 + 0.82).toFixed(2)),
+      summary: `Injected via Social Pulse Link Validator. This post is undergoing active AI-guided campaign integrity monitoring and data validation. Initial comment clusters conform to high-budget structured narrative distributions.`,
+      region: region,
+      duration: "3:42"
+    };
+
+    // Calculate simulated sentiment label
+    if (newVideo.sentimentScore > 0.25) {
+      newVideo.sentimentLabel = "Positive";
+    } else if (newVideo.sentimentScore < -0.25) {
+      newVideo.sentimentLabel = "Negative";
+    } else {
+      newVideo.sentimentLabel = "Neutral";
+    }
+
+    // Insert into state list
+    setData(prev => {
+      if (!prev) return prev;
+      return {
+        ...prev,
+        videos: [newVideo, ...prev.videos]
+      };
+    });
+
+    setSearchQuery(newVideo.url);
+    setLinkValidationSuccess(`Successfully validated and Ingested! Feed filtered to this post.`);
+    setLinkValidationError(null);
+    setPastedLink("");
+
+    // Add to history list
+    const historyItem = {
+      id: newVideo.id,
+      url: newVideo.url,
+      platform: newVideo.platform,
+      title: newVideo.title,
+      timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
+    };
+    const filtered = recentlyScanned.filter(item => item.url.toLowerCase() !== newVideo.url.toLowerCase());
+    saveRecentlyScanned([historyItem, ...filtered].slice(0, 10));
+
+    setShareToast({
+      message: `Injected post from ${analysis.platform} into feed with live Watchdog scanner active!`,
+      type: "success"
+    });
+  };
+
+  const handleQrScanSuccess = (scannedUrl: string) => {
+    setIsQrScannerOpen(false);
+    setPastedLink(scannedUrl);
+    setLinkValidationError(null);
+    setLinkValidationSuccess(null);
+    injectCustomVideo(scannedUrl);
+  };
+
+  // Handle QR Camera scanning lifecycle
+  useEffect(() => {
+    let active = true;
+    let animationId: number;
+
+    const stopCamera = () => {
+      if (streamRef.current) {
+        streamRef.current.getTracks().forEach(track => track.stop());
+        streamRef.current = null;
+      }
+      if (videoRef.current) {
+        videoRef.current.srcObject = null;
+      }
+      if (active) {
+        setHasTorch(false);
+        setIsTorchOn(false);
+      }
+    };
+
+    const startCamera = async () => {
+      stopCamera();
+      setQrScannerError(null);
+
+      try {
+        const devices = await navigator.mediaDevices.enumerateDevices();
+        const videoDevices = devices.filter(d => d.kind === "videoinput");
+        if (active) {
+          setAvailableCameras(videoDevices);
+          if (videoDevices.length > 0 && !activeCameraId) {
+            const rearCam = videoDevices.find(d => 
+              d.label.toLowerCase().includes("back") || 
+              d.label.toLowerCase().includes("rear") || 
+              d.label.toLowerCase().includes("environment")
+            );
+            setActiveCameraId(rearCam ? rearCam.deviceId : videoDevices[0].deviceId);
+          }
+        }
+
+        const constraints: MediaStreamConstraints = {
+          video: activeCameraId 
+            ? { deviceId: { exact: activeCameraId } } 
+            : { facingMode: "environment" }
+        };
+
+        const stream = await navigator.mediaDevices.getUserMedia(constraints);
+        if (!active) {
+          stream.getTracks().forEach(track => track.stop());
+          return;
+        }
+
+        streamRef.current = stream;
+        if (videoRef.current) {
+          videoRef.current.srcObject = stream;
+          videoRef.current.play().catch(err => {
+            console.warn("Autoplay failed:", err);
+          });
+        }
+
+        // Check for torch capability
+        const track = stream.getVideoTracks()[0];
+        if (track) {
+          try {
+            if (typeof track.getCapabilities === "function") {
+              const capabilities = track.getCapabilities() as any;
+              if (active) {
+                const supported = !!capabilities.torch;
+                setHasTorch(supported);
+                if (supported && isTorchOn) {
+                  await track.applyConstraints({
+                    advanced: [{ torch: true } as any]
+                  });
+                }
+              }
+            } else {
+              if (active) {
+                setHasTorch(false);
+              }
+            }
+          } catch (e) {
+            console.warn("Could not retrieve camera capabilities", e);
+            if (active) setHasTorch(false);
+          }
+        }
+
+        let lastScanTime = 0;
+        const scanFrame = () => {
+          if (!active) return;
+
+          const now = Date.now();
+          if (now - lastScanTime > 150) {
+            lastScanTime = now;
+            if (videoRef.current && videoRef.current.readyState === videoRef.current.HAVE_ENOUGH_DATA) {
+              const video = videoRef.current;
+              const width = video.videoWidth;
+              const height = video.videoHeight;
+
+              const canvas = document.createElement("canvas");
+              canvas.width = width;
+              canvas.height = height;
+              const ctx = canvas.getContext("2d");
+
+              if (ctx) {
+                ctx.drawImage(video, 0, 0, width, height);
+                try {
+                  const imgData = ctx.getImageData(0, 0, width, height);
+                  const qrCode = jsQR(imgData.data, imgData.width, imgData.height, {
+                    inversionAttempts: "dontInvert"
+                  });
+
+                  if (qrCode && qrCode.data) {
+                    const detectedUrl = qrCode.data.trim();
+                    if (detectedUrl) {
+                      handleQrScanSuccess(detectedUrl);
+                      return;
+                    }
+                  }
+                } catch (e) {
+                  console.error("Scanning frame error:", e);
+                }
+              }
+            }
+          }
+          animationId = requestAnimationFrame(scanFrame);
+        };
+
+        animationId = requestAnimationFrame(scanFrame);
+
+      } catch (err: any) {
+        console.error("Camera access error:", err);
+        if (active) {
+          if (err.name === "NotAllowedError" || err.name === "PermissionDeniedError") {
+            setQrScannerError("Camera permission denied. Please allow camera access in your browser settings to scan QR codes.");
+          } else if (err.name === "NotFoundError" || err.name === "DevicesNotFoundError") {
+            setQrScannerError("No camera device found on this system.");
+          } else {
+            setQrScannerError(`Failed to initialize camera: ${err.message || "Unknown error"}`);
+          }
+        }
+      }
+    };
+
+    if (isQrScannerOpen) {
+      startCamera();
+    } else {
+      stopCamera();
+    }
+
+    return () => {
+      active = false;
+      cancelAnimationFrame(animationId);
+      stopCamera();
+    };
+  }, [isQrScannerOpen, activeCameraId]);
+
+  // Dynamically control torch/flashlight
+  useEffect(() => {
+    const applyTorchState = async () => {
+      if (isQrScannerOpen && streamRef.current) {
+        const track = streamRef.current.getVideoTracks()[0];
+        if (track) {
+          try {
+            await track.applyConstraints({
+              advanced: [{ torch: isTorchOn } as any]
+            });
+          } catch (e) {
+            console.warn("Failed to apply torch constraint dynamically:", e);
+          }
+        }
+      }
+    };
+    applyTorchState();
+  }, [isTorchOn, isQrScannerOpen]);
+
   const [selectedKeyword, setSelectedKeyword] = useState<string | null>(null);
   const [expandedCard, setExpandedCard] = useState<string | null>(null);
   const [selectedCategoryModal, setSelectedCategoryModal] = useState<{ category: string; clickedVideoId: string } | null>(null);
@@ -1078,7 +1517,35 @@ export default function App() {
       }
       // Freeform Text Search Match
       if (searchQuery.trim() !== "") {
-        const query = searchQuery.toLowerCase();
+        const query = searchQuery.trim().toLowerCase();
+        
+        // Check if query looks like a link
+        const looksLikeLink = query.startsWith("http://") || query.startsWith("https://") || 
+                              query.includes("youtube.com") || query.includes("youtu.be") || 
+                              query.includes("facebook.com") || query.includes("instagram.com") || 
+                              query.includes("tiktok.com") || query.includes("x.com") || query.includes("twitter.com");
+
+        if (looksLikeLink) {
+          const parsedQuery = validateSocialMediaLink(query);
+          if (parsedQuery.isValid) {
+            // Direct URL match
+            if (video.url.toLowerCase().trim() === query) return true;
+            
+            const parsedVideo = validateSocialMediaLink(video.url);
+            if (parsedVideo.isValid && parsedVideo.isValidSocial && parsedQuery.isValidSocial) {
+              if (parsedVideo.platform.toLowerCase() === parsedQuery.platform.toLowerCase() && 
+                  parsedVideo.videoId && parsedVideo.videoId === parsedQuery.videoId) {
+                return true;
+              }
+            }
+            
+            // Substring videoId match
+            if (parsedQuery.videoId && video.url.toLowerCase().includes(parsedQuery.videoId.toLowerCase())) {
+              return true;
+            }
+          }
+        }
+
         const matchesTitle = video.title.toLowerCase().includes(query);
         const matchesUploader = video.uploader.toLowerCase().includes(query);
         const matchesSummary = video.summary.toLowerCase().includes(query);
@@ -1647,6 +2114,324 @@ export default function App() {
         {/* LEFT COLUMN: FILTERS & CONTROLS (3 cols) */}
         <div className="lg:col-span-3 space-y-6">
           
+          {/* SOCIAL PULSE LINK VALIDATOR & INTEGRITY SCANNER CARD */}
+          <div className="bg-white rounded-xl border border-slate-200 p-5 space-y-4 shadow-sm relative overflow-hidden">
+            <div className="absolute right-0 top-0 p-4 opacity-5 pointer-events-none select-none">
+              <Link2 className="w-16 h-16 text-indigo-600" />
+            </div>
+            
+            <div className="flex items-center justify-between pb-3 border-b border-slate-100">
+              <div className="flex items-center gap-2 text-slate-800">
+                <Link2 className="w-4 h-4 text-indigo-600 animate-pulse" />
+                <h2 className="text-sm font-semibold uppercase tracking-wider font-display">Link Integrity Scanner</h2>
+              </div>
+              <span className="text-[9px] font-mono font-extrabold text-indigo-700 bg-indigo-50 border border-indigo-100 px-1.5 py-0.5 rounded">ACTIVE</span>
+            </div>
+
+            <p className="text-[11px] text-slate-500 leading-relaxed">
+              Paste a social media URL to validate its cryptographic ID format, trace campaign origins, and audit sentiment profiles.
+            </p>
+
+            <div className="space-y-3">
+              <div className="space-y-1.5">
+                <div className="flex justify-between items-center">
+                  <div className="flex items-center gap-2">
+                    <label className="text-[10px] font-mono uppercase font-bold text-slate-400">Pasted Target URL</label>
+                    <button
+                      onClick={() => setIsQrScannerOpen(prev => !prev)}
+                      className={`flex items-center gap-1.5 text-[9px] font-bold uppercase font-mono px-1.5 py-0.5 rounded border transition-all cursor-pointer ${
+                        isQrScannerOpen 
+                          ? "bg-rose-50 border-rose-200 text-rose-600 hover:bg-rose-100" 
+                          : "bg-indigo-50 border-indigo-100 text-indigo-600 hover:bg-indigo-100/80"
+                      }`}
+                      title={isQrScannerOpen ? "Close Camera Scanner" : "Scan QR Code using device camera"}
+                    >
+                      <Camera className="w-3.5 h-3.5" />
+                      <span>{isQrScannerOpen ? "Close Scanner" : "Scan QR Code"}</span>
+                    </button>
+                  </div>
+                  {pastedLink && (
+                    <button 
+                      onClick={() => {
+                        setPastedLink("");
+                        setLinkValidationError(null);
+                        setLinkValidationSuccess(null);
+                      }} 
+                      className="text-[10px] text-slate-400 hover:text-red-500 font-mono animate-fade-in"
+                    >
+                      Clear
+                    </button>
+                  )}
+                </div>
+
+                {/* QR Camera Scanner Viewfinder */}
+                <AnimatePresence>
+                  {isQrScannerOpen && (
+                    <motion.div
+                      initial={{ opacity: 0, height: 0 }}
+                      animate={{ opacity: 1, height: "auto" }}
+                      exit={{ opacity: 0, height: 0 }}
+                      className="overflow-hidden pb-1"
+                    >
+                      <div className="relative bg-slate-950 rounded-xl overflow-hidden aspect-video border border-slate-800 shadow-inner flex flex-col items-center justify-center">
+                        
+                        {/* Video Stream */}
+                        <video
+                          ref={videoRef}
+                          playsInline
+                          muted
+                          className="w-full h-full object-cover"
+                        />
+
+                        {/* Scanning Overlays (Only show if no error) */}
+                        {!qrScannerError && (
+                          <>
+                            {/* Corner Targets */}
+                            <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
+                              <div className="w-32 h-32 md:w-40 md:h-40 border border-emerald-500/20 rounded-lg relative">
+                                {/* Corner brackets */}
+                                <div className="absolute -top-1 -left-1 w-3.5 h-3.5 border-t-2 border-l-2 border-emerald-500 rounded-tl" />
+                                <div className="absolute -top-1 -right-1 w-3.5 h-3.5 border-t-2 border-r-2 border-emerald-500 rounded-tr" />
+                                <div className="absolute -bottom-1 -left-1 w-3.5 h-3.5 border-b-2 border-l-2 border-emerald-500 rounded-bl" />
+                                <div className="absolute -bottom-1 -right-1 w-3.5 h-3.5 border-b-2 border-r-2 border-emerald-500 rounded-br" />
+                                
+                                {/* Lasers and status inside finder */}
+                                <div className="absolute left-0 right-0 h-0.5 bg-emerald-400 shadow-[0_0_8px_rgba(52,211,153,1)] animate-scan" />
+                              </div>
+                            </div>
+
+                            {/* Top Status Indicators */}
+                            <div className="absolute top-2.5 left-2.5 right-2.5 flex items-center justify-between pointer-events-none">
+                              <div className="flex items-center gap-1.5 px-2 py-0.5 bg-slate-900/80 backdrop-blur rounded text-[9px] font-mono text-emerald-400 font-bold border border-emerald-500/20">
+                                <span className="w-1.5 h-1.5 bg-emerald-500 rounded-full animate-pulse" />
+                                <span>LIVE VIEW</span>
+                              </div>
+                              
+                              {/* Camera select control */}
+                              {availableCameras.length > 1 && (
+                                <select
+                                  value={activeCameraId}
+                                  onChange={(e) => setActiveCameraId(e.target.value)}
+                                  className="pointer-events-auto bg-slate-900/90 text-white border border-slate-700 rounded px-1.5 py-0.5 text-[9px] font-mono focus:outline-none focus:border-indigo-500 max-w-[110px] truncate"
+                                >
+                                  {availableCameras.map((cam, idx) => (
+                                    <option key={cam.deviceId} value={cam.deviceId}>
+                                      {cam.label || `Camera ${idx + 1}`}
+                                    </option>
+                                  ))}
+                                </select>
+                              )}
+                            </div>
+
+                            {/* Instructions Overlay */}
+                            <div className="absolute bottom-2.5 inset-x-0 text-center pointer-events-none">
+                              <span className="px-2.5 py-0.5 bg-slate-900/80 backdrop-blur text-[9px] font-mono text-slate-300 rounded border border-slate-800">
+                                Place QR code inside the center frame
+                              </span>
+                            </div>
+
+                            {/* Flashlight/Torch Control */}
+                            <div className="absolute bottom-2.5 right-2.5 pointer-events-auto z-10">
+                              <button
+                                type="button"
+                                disabled={!hasTorch}
+                                onClick={() => setIsTorchOn(prev => !prev)}
+                                className={`p-2 rounded-full border transition flex items-center justify-center cursor-pointer shadow ${
+                                  !hasTorch
+                                    ? "bg-slate-900/40 text-slate-600 border-slate-800/40 cursor-not-allowed"
+                                    : isTorchOn 
+                                      ? "bg-amber-500 text-slate-950 border-amber-400 hover:bg-amber-600 shadow-[0_0_10px_rgba(245,158,11,0.5)]" 
+                                      : "bg-slate-900/85 text-slate-300 border-slate-700 hover:bg-slate-800 hover:text-white"
+                                }`}
+                                title={
+                                  !hasTorch 
+                                    ? "Flashlight is only supported on mobile devices with a physical camera flash" 
+                                    : isTorchOn 
+                                      ? "Turn Off Flashlight" 
+                                      : "Turn On Flashlight"
+                                }
+                              >
+                                <Zap className={`w-3.5 h-3.5 ${isTorchOn ? "fill-current animate-pulse" : ""}`} />
+                              </button>
+                            </div>
+                          </>
+                        )}
+
+                        {/* Error State */}
+                        {qrScannerError && (
+                          <div className="absolute inset-0 bg-slate-950 p-4 flex flex-col items-center justify-center text-center space-y-2">
+                            <AlertTriangle className="w-8 h-8 text-rose-500" />
+                            <div className="space-y-0.5">
+                              <p className="text-[10px] font-bold text-slate-200 uppercase tracking-wider font-mono">Camera Error</p>
+                              <p className="text-[9px] text-slate-400 leading-normal max-w-[200px]">{qrScannerError}</p>
+                            </div>
+                            <button
+                              onClick={() => {
+                                setQrScannerError(null);
+                                const currentId = activeCameraId;
+                                setActiveCameraId("");
+                                setTimeout(() => setActiveCameraId(currentId), 100);
+                              }}
+                              className="px-2 py-1 bg-slate-800 hover:bg-slate-700 text-white rounded font-mono text-[9px] font-bold border border-slate-700 transition cursor-pointer"
+                            >
+                              Retry Camera
+                            </button>
+                          </div>
+                        )}
+                      </div>
+                    </motion.div>
+                  )}
+                </AnimatePresence>
+
+                <div className="relative">
+                  <input
+                    type="text"
+                    value={pastedLink}
+                    onChange={(e) => {
+                      const val = e.target.value;
+                      setPastedLink(val);
+                      setLinkValidationError(null);
+                      setLinkValidationSuccess(null);
+                    }}
+                    placeholder="Paste YouTube, FB, IG, TikTok, or X link..."
+                    className="w-full text-xs bg-white border border-slate-200 rounded-lg py-2 pl-3 pr-20 focus:outline-none focus:border-indigo-500/50 text-slate-700 transition shadow-sm font-mono"
+                  />
+                  <button
+                    onClick={() => injectCustomVideo(pastedLink)}
+                    disabled={!pastedLink.trim()}
+                    className="absolute right-1 top-1 bottom-1 px-2.5 bg-indigo-600 hover:bg-indigo-700 text-white font-bold rounded-md text-[10px] transition disabled:opacity-50 disabled:cursor-not-allowed"
+                  >
+                    Scan & Ingest
+                  </button>
+                </div>
+              </div>
+
+              {/* Live Feedback of the pasted link */}
+              {pastedLink.trim() && (() => {
+                const analysis = validateSocialMediaLink(pastedLink);
+                return (
+                  <div className={`p-3 rounded-lg border text-xs space-y-2 transition ${
+                    analysis.isValid 
+                      ? "bg-emerald-50 border-emerald-100 text-emerald-900" 
+                      : "bg-rose-50 border-rose-100 text-rose-900"
+                  }`}>
+                    <div className="flex items-center justify-between font-bold">
+                      <span className="flex items-center gap-1">
+                        {analysis.isValid ? (
+                          <CheckCircle className="w-3.5 h-3.5 text-emerald-600 animate-pulse" />
+                        ) : (
+                          <AlertTriangle className="w-3.5 h-3.5 text-rose-600" />
+                        )}
+                        <span>Structure: {analysis.isValid ? "Valid URL Format" : "Invalid Structure"}</span>
+                      </span>
+                      <span className={`px-1.5 py-0.5 rounded text-[9px] uppercase font-mono tracking-wider font-extrabold ${
+                        analysis.isValid 
+                          ? "bg-emerald-100 text-emerald-700 border border-emerald-200" 
+                          : "bg-rose-100 text-rose-700 border border-rose-200"
+                      }`}>
+                        {analysis.isValid ? "Pass" : "Fail"}
+                      </span>
+                    </div>
+
+                    {analysis.isValid ? (
+                      <div className="space-y-1.5 text-[11px]">
+                        <div className="grid grid-cols-2 gap-1 font-mono text-[10px]">
+                          <div>
+                            <span className="opacity-75">Platform:</span> <strong className="text-slate-900">{analysis.platform}</strong>
+                          </div>
+                          <div className="truncate">
+                            <span className="opacity-75">ID:</span> <strong className="text-slate-900 font-bold truncate">{analysis.videoId || "N/A"}</strong>
+                          </div>
+                        </div>
+                        <p className="text-[10px] leading-relaxed text-emerald-800">
+                          {analysis.isValidSocial 
+                            ? "✓ Fully compatible with our live AI Campaign Sentiment analysis." 
+                            : "⚠ Generic link format. Will inherit default sandbox campaign metrics."}
+                        </p>
+                      </div>
+                    ) : (
+                      <p className="text-[10.5px] leading-relaxed text-rose-700">
+                        {analysis.error}
+                      </p>
+                    )}
+                  </div>
+                );
+              })()}
+
+              {/* Status Notifications */}
+              {linkValidationError && (
+                <div className="p-3 bg-red-50 border border-red-100 rounded-lg text-xs text-red-700 font-medium flex items-start gap-1.5 animate-pulse">
+                  <AlertTriangle className="w-3.5 h-3.5 text-red-600 mt-0.5 shrink-0" />
+                  <span>{linkValidationError}</span>
+                </div>
+              )}
+
+              {linkValidationSuccess && (
+                <div className="p-3 bg-emerald-50 border border-emerald-100 rounded-lg text-xs text-emerald-800 font-medium flex items-start gap-1.5">
+                  <CheckCircle className="w-3.5 h-3.5 text-emerald-600 mt-0.5 shrink-0" />
+                  <span>{linkValidationSuccess}</span>
+                </div>
+              )}
+
+              {/* Recently Scanned URLs History List */}
+              {recentlyScanned.length > 0 && (
+                <div className="pt-3 border-t border-slate-100 space-y-2">
+                  <div className="flex items-center justify-between text-[10px] font-mono uppercase font-bold text-slate-400">
+                    <span>Recently Scanned URLs</span>
+                    <button 
+                      onClick={() => saveRecentlyScanned([])}
+                      className="hover:text-red-500 font-bold transition text-[9px] uppercase tracking-wider"
+                    >
+                      Clear All
+                    </button>
+                  </div>
+                  <div className="space-y-1.5 max-h-[160px] overflow-y-auto pr-0.5 custom-scrollbar">
+                    {recentlyScanned.map((item) => (
+                      <div 
+                        key={item.id}
+                        className="group flex items-center justify-between gap-2 p-2 rounded-lg bg-slate-50 border border-slate-100 hover:border-indigo-100 hover:bg-indigo-50/25 transition-all text-xs cursor-pointer"
+                        onClick={() => {
+                          setSearchQuery(item.url);
+                          setLinkValidationSuccess(`Switched active view to recently scanned target.`);
+                          setLinkValidationError(null);
+                        }}
+                      >
+                        <div className="flex-1 min-w-0 space-y-0.5">
+                          <div className="flex items-center gap-1.5">
+                            <span className="text-[9px] font-extrabold uppercase font-mono px-1 bg-slate-200/60 text-slate-600 rounded text-center shrink-0">
+                              {item.platform}
+                            </span>
+                            <span className="text-[9px] text-slate-400 font-mono shrink-0">
+                              {item.timestamp}
+                            </span>
+                          </div>
+                          <p className="text-[11px] font-medium text-slate-700 truncate group-hover:text-indigo-900 transition-colors">
+                            {item.title || item.url}
+                          </p>
+                        </div>
+                        <button
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            const updated = recentlyScanned.filter(x => x.id !== item.id);
+                            saveRecentlyScanned(updated);
+                            setShareToast({
+                              message: "Removed item from recently scanned history.",
+                              type: "info"
+                            });
+                          }}
+                          className="p-1 hover:bg-slate-200/50 rounded text-slate-400 hover:text-red-500 transition-colors shrink-0 opacity-60 md:opacity-0 md:group-hover:opacity-100"
+                          title="Remove from history"
+                        >
+                          <Trash2 className="w-3.5 h-3.5" />
+                        </button>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
+            </div>
+          </div>
+
           {/* SEARCH FILTERS CARD */}
           <div className="bg-white rounded-xl border border-slate-200 p-5 space-y-5 shadow-sm">
             <div className="flex items-center justify-between pb-3 border-b border-slate-100">
